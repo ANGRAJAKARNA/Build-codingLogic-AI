@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot generator="Robot 7.2.2 (Python 3.9.6 on darwin)" generated="2025-05-14T17:12:22.301379" rpa="false" schemaversion="5">
+<suite id="s1" name="Openchrome" source="/Users/naveenkumar.yellared/PycharmProjects/PythonProject/openchrome.robot">
+<test id="s1-t1" name="Run Page" line="9">
+<kw name="Open Browser" owner="SeleniumLibrary">
+<msg time="2025-05-14T17:12:22.381794" level="INFO">Opening browser 'chrome' to base url 'https://www.amazon.in/'.</msg>
+<arg>${u}</arg>
+<arg>${b}</arg>
+<doc>Opens a new browser instance to the optional ``url``.</doc>
+<status status="PASS" start="2025-05-14T17:12:22.381648" elapsed="3.552059"/>
+</kw>
+<kw name="Maximize Browser Window" owner="SeleniumLibrary">
+<doc>Maximizes current browser window.</doc>
+<status status="PASS" start="2025-05-14T17:12:25.934063" elapsed="0.491073"/>
+</kw>
+<kw name="Sleep" owner="BuiltIn">
+<msg time="2025-05-14T17:12:29.428703" level="INFO">Slept 3 seconds.</msg>
+<arg>3s</arg>
+<doc>Pauses the test executed for the given time.</doc>
+<status status="PASS" start="2025-05-14T17:12:26.425337" elapsed="3.003837"/>
+</kw>
+<kw name="Click Element" owner="SeleniumLibrary">
+<msg time="2025-05-14T17:12:29.431921" level="INFO">Clicking element '//span[@class="nav-line-2 "]'.</msg>
+<arg>//span[@class="nav-line-2 "]</arg>
+<doc>Click the element identified by ``locator``.</doc>
+<status status="PASS" start="2025-05-14T17:12:29.430295" elapsed="0.888210"/>
+</kw>
+<kw name="Sleep" owner="BuiltIn">
+<msg time="2025-05-14T17:12:33.319099" level="INFO">Slept 3 seconds.</msg>
+<arg>3</arg>
+<doc>Pauses the test executed for the given time.</doc>
+<status status="PASS" start="2025-05-14T17:12:30.318719" elapsed="3.000762"/>
+</kw>
+<kw name="Close Browser" owner="SeleniumLibrary">
+<doc>Closes the current browser.</doc>
+<status status="PASS" start="2025-05-14T17:12:33.320264" elapsed="0.094838"/>
+</kw>
+<status status="PASS" start="2025-05-14T17:12:22.381153" elapsed="11.034130"/>
+</test>
+<status status="PASS" start="2025-05-14T17:12:22.302331" elapsed="11.113207"/>
+</suite>
+<statistics>
+<total>
+<stat pass="1" fail="0" skip="0">All Tests</stat>
+</total>
+<tag>
+</tag>
+<suite>
+<stat name="Openchrome" id="s1" pass="1" fail="0" skip="0">Openchrome</stat>
+</suite>
+</statistics>
+<errors>
+</errors>
+</robot>
