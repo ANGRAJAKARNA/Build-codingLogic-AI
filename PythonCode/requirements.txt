@@ -1,0 +1,40 @@
+# PyCode - Requirements
+# Install with: pip install -r requirements.txt
+
+# Core framework
+streamlit>=1.28.0
+
+# AI Service (Groq) - Optional
+groq>=0.4.0
+
+# Environment variables (optional, for .env file support)
+python-dotenv>=1.0.0
+
+# =============================================================================
+# PDF Knowledge Base (Local - No API Required)
+# =============================================================================
+
+# PDF parsing - extract text from PDF files
+pymupdf>=1.23.0
+
+# Local embeddings - no API key needed
+sentence-transformers>=2.2.0
+
+# Vector similarity search - fast nearest neighbor search
+faiss-cpu>=1.7.4
+
+# Numerical operations (usually installed with above)
+numpy>=1.24.0
+
+# =============================================================================
+# Note: Standard library modules used (no installation needed):
+# - threading (timeout for code execution)
+# - json (persistence)
+# - re (security pattern matching)
+# - time (timer functionality)
+# - pathlib (file operations)
+# - datetime (timestamps)
+# - traceback (error formatting)
+# - pickle (caching)
+# - logging (diagnostics)
+# =============================================================================
