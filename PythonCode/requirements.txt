@@ -10,6 +10,9 @@ groq>=0.4.0
 # Environment variables (optional, for .env file support)
 python-dotenv>=1.0.0
 
+# Charts and visualizations
+plotly>=5.18.0
+
 # =============================================================================
 # PDF Knowledge Base (Local - No API Required)
 # =============================================================================
@@ -25,6 +28,16 @@ faiss-cpu>=1.7.4
 
 # Numerical operations (usually installed with above)
 numpy>=1.24.0
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+# Test framework
+pytest>=7.4.0
+
+# Test coverage reports
+pytest-cov>=4.1.0
 
 # =============================================================================
 # Note: Standard library modules used (no installation needed):

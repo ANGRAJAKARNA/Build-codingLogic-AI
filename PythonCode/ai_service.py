@@ -515,4 +515,3 @@ def analyze_performance(
         analysis['recommended_difficulty'] = 'Basic'
     
     return analysis
-

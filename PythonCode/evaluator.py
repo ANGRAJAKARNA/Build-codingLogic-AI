@@ -14,6 +14,16 @@ from typing import Tuple, List, Any
 # Execution timeout in seconds
 TIMEOUT_SECONDS = 5
 
+# Import safe modules that users might need
+import math
+import collections
+import heapq
+import itertools
+import functools
+import string
+import operator
+import bisect
+
 # Safe builtins whitelist - only allow safe operations
 SAFE_BUILTINS = {
     # Types
@@ -29,6 +39,7 @@ SAFE_BUILTINS = {
     'bytes': bytes,
     'bytearray': bytearray,
     'complex': complex,
+    'object': object,
     
     # Functions
     'abs': abs,
@@ -42,7 +53,9 @@ SAFE_BUILTINS = {
     'format': format,
     'hash': hash,
     'hex': hex,
+    'id': id,
     'isinstance': isinstance,
+    'issubclass': issubclass,
     'iter': iter,
     'len': len,
     'map': map,
@@ -60,6 +73,9 @@ SAFE_BUILTINS = {
     'sorted': sorted,
     'sum': sum,
     'zip': zip,
+    'callable': callable,
+    'ascii': ascii,
+    'input': lambda *args: "",  # Safe no-op input
     
     # Constants
     'True': True,
@@ -78,6 +94,47 @@ SAFE_BUILTINS = {
     'KeyError': KeyError,
     'ZeroDivisionError': ZeroDivisionError,
     'StopIteration': StopIteration,
+    'RuntimeError': RuntimeError,
+    'AttributeError': AttributeError,
+    'RecursionError': RecursionError,
+    'OverflowError': OverflowError,
+    'AssertionError': AssertionError,
+    
+    # Safe modules - commonly needed for algorithm problems
+    'math': math,
+    'collections': collections,
+    'heapq': heapq,
+    'itertools': itertools,
+    'functools': functools,
+    'string': string,
+    'operator': operator,
+    'bisect': bisect,
+    
+    # Commonly used from collections
+    'Counter': collections.Counter,
+    'defaultdict': collections.defaultdict,
+    'deque': collections.deque,
+    'OrderedDict': collections.OrderedDict,
+    'namedtuple': collections.namedtuple,
+    
+    # Commonly used from functools
+    'reduce': functools.reduce,
+    'lru_cache': functools.lru_cache,
+    'cache': getattr(functools, 'cache', functools.lru_cache(maxsize=None)),
+    
+    # Commonly used from itertools
+    'permutations': itertools.permutations,
+    'combinations': itertools.combinations,
+    'product': itertools.product,
+    'chain': itertools.chain,
+    'groupby': itertools.groupby,
+    
+    # Commonly used from heapq
+    'heappush': heapq.heappush,
+    'heappop': heapq.heappop,
+    'heapify': heapq.heapify,
+    'nlargest': heapq.nlargest,
+    'nsmallest': heapq.nsmallest,
 }
 
 # Dangerous patterns to detect
@@ -141,6 +198,34 @@ COMMON_MISTAKES = {
     'timeout': {
         'message': "❌ Time Limit Exceeded",
         'suggestion': "💡 Your code took too long. Check for infinite loops or optimize your solution"
+    },
+    'recursion_error': {
+        'message': "❌ Maximum Recursion Depth Exceeded",
+        'suggestion': "💡 Your recursion doesn't have a proper base case or recurses too deeply. Add a base case!"
+    },
+    'attribute_error': {
+        'message': "❌ Attribute Error",
+        'suggestion': "💡 You're accessing a method or property that doesn't exist on this object"
+    },
+    'key_error': {
+        'message': "❌ Key Error",
+        'suggestion': "💡 The key you're trying to access doesn't exist in the dictionary. Use .get() or check with 'in'"
+    },
+    'zero_division': {
+        'message': "❌ Division by Zero",
+        'suggestion': "💡 You're dividing by zero. Add a check to prevent this"
+    },
+    'overflow_error': {
+        'message': "❌ Overflow Error",
+        'suggestion': "💡 The number is too large to handle. Consider using a different approach"
+    },
+    'assertion_error': {
+        'message': "❌ Assertion Failed",
+        'suggestion': "💡 An assertion in your code failed. Check your logic"
+    },
+    'value_error': {
+        'message': "❌ Value Error",
+        'suggestion': "💡 A function received an argument with the right type but inappropriate value"
     }
 }
 

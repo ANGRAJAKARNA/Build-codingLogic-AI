@@ -153,6 +153,158 @@ def _ensure_pdf_kb_initialized():
             pass  # Silently fail - will use fallback
 
 
+# =============================================================================
+# AUTOMATION CONCEPTS INTEGRATION (Selenium, Robot Framework, pytest)
+# =============================================================================
+
+AUTOMATION_CONCEPTS_AVAILABLE = False
+
+try:
+    from automation_concepts import (
+        SELENIUM_CONCEPTS,
+        ROBOT_FRAMEWORK_CONCEPTS,
+        RELATED_TOOLS_CONCEPTS,
+        ALL_AUTOMATION_CONCEPTS,
+        AUTOMATION_TAGS
+    )
+    AUTOMATION_CONCEPTS_AVAILABLE = True
+except ImportError:
+    SELENIUM_CONCEPTS = {}
+    ROBOT_FRAMEWORK_CONCEPTS = {}
+    RELATED_TOOLS_CONCEPTS = {}
+    ALL_AUTOMATION_CONCEPTS = {}
+    AUTOMATION_TAGS = []
+
+
+def _match_automation_concept(topic: str, topic_words: List[str]) -> Optional[str]:
+    """
+    Match user query against automation concepts (Selenium, Robot Framework, etc.)
+    
+    Args:
+        topic: Cleaned topic string from user query
+        topic_words: List of words from the topic
+        
+    Returns:
+        Matching concept explanation or None
+    """
+    if not AUTOMATION_CONCEPTS_AVAILABLE:
+        return None
+    
+    topic_lower = topic.lower()
+    topic_words_lower = [w.lower() for w in topic_words]
+    full_query = ' '.join(topic_words_lower)
+    
+    # Map of related terms to help matching (term in query -> implied concept prefix)
+    term_to_concept_prefix = {
+        'xpath': 'selenium',
+        'css': 'selenium',
+        'webdriver': 'selenium',
+        'browser': 'selenium',
+        'element': 'selenium',
+        'click': 'selenium',
+        'wait': 'selenium',
+        'alert': 'selenium',
+        'frame': 'selenium',
+        'iframe': 'selenium',
+        'pabot': 'robot',
+        'resource': 'robot',
+        'keyword': 'robot',
+    }
+    
+    # Expand query with implied terms
+    expanded_words = list(topic_words_lower)
+    for query_term, implied_prefix in term_to_concept_prefix.items():
+        if query_term in topic_words_lower and implied_prefix not in topic_words_lower:
+            expanded_words.append(implied_prefix)
+    
+    expanded_query = ' '.join(expanded_words)
+    
+    # Specific topic terms that should be prioritized in matching
+    specific_terms = ['keywords', 'variables', 'waits', 'locators', 'actions', 
+                     'alerts', 'frames', 'cookies', 'screenshots', 'fixtures',
+                     'seleniumlibrary', 'control', 'flow', 'resource', 'files', 'tags',
+                     'listeners', 'pabot', 'grid', 'page', 'object', 'structure',
+                     'reporting', 'implicit', 'explicit', 'fluent', 'xpath', 'css',
+                     'attributes', 'handling', 'custom', 'library']
+    
+    # Find which specific term the user is asking about
+    query_specific_term = None
+    for term in specific_terms:
+        if term in expanded_words:
+            query_specific_term = term
+            break
+    
+    # Search for best matching concept
+    best_match = None
+    best_score = 0
+    
+    for concept_key in ALL_AUTOMATION_CONCEPTS.keys():
+        score = 0
+        concept_lower = concept_key.lower()
+        concept_words = concept_lower.split()
+        
+        # Exact match (highest priority)
+        if concept_lower == full_query or concept_lower == expanded_query:
+            score = 200
+        
+        # If user asks about a specific topic (e.g., "keywords"), prioritize concepts containing that term
+        elif query_specific_term and query_specific_term in concept_lower:
+            # Check if the prefix matches (using expanded words)
+            prefix_matches = any(cw in expanded_words for cw in concept_words if cw != query_specific_term)
+            if prefix_matches:
+                score = 150 + len(concept_key)  # High priority for specific matches
+            else:
+                score = 100 + len(concept_key)
+        
+        # All concept words present in expanded query
+        elif all(cw in expanded_words for cw in concept_words):
+            score = 90 + len(concept_key)
+        
+        # Concept key as substring in expanded query
+        elif concept_lower in expanded_query:
+            score = 80 + len(concept_key)
+        
+        # Partial match - some concept words present
+        elif any(cw in expanded_words for cw in concept_words):
+            matching_count = sum(1 for cw in concept_words if cw in expanded_words)
+            score = 50 + (matching_count * 10)
+        
+        if score > best_score:
+            best_score = score
+            best_match = concept_key
+    
+    if best_match and best_score >= 50:
+        return ALL_AUTOMATION_CONCEPTS[best_match]
+    
+    return None
+
+
+def get_automation_concept(concept_name: str) -> Optional[str]:
+    """
+    Get a specific automation concept by name.
+    
+    Args:
+        concept_name: Name of the concept to retrieve
+        
+    Returns:
+        Concept explanation or None if not found
+    """
+    if not AUTOMATION_CONCEPTS_AVAILABLE:
+        return None
+    
+    # Try exact match first
+    if concept_name in ALL_AUTOMATION_CONCEPTS:
+        return ALL_AUTOMATION_CONCEPTS[concept_name]
+    
+    # Try case-insensitive match
+    concept_lower = concept_name.lower()
+    for key in ALL_AUTOMATION_CONCEPTS:
+        if key.lower() == concept_lower:
+            return ALL_AUTOMATION_CONCEPTS[key]
+    
+    return None
+
+
 def query_pdf_knowledge(question: str) -> Optional[str]:
     """
     Query the PDF knowledge base for an answer.
@@ -5705,20 +5857,68 @@ def _find_concept_answer(topic: str) -> Optional[str]:
     
     topic_words = topic_lower.split()
     
-    # Find best matching concept
+    # Common Python terms - prefer Python CONCEPTS over automation
+    python_priority_terms = ['class', 'object', 'function', 'method', 'variable', 'loop', 
+                             'list', 'dict', 'tuple', 'set', 'string', 'integer', 'float',
+                             'exception', 'import', 'module', 'decorator', 'generator',
+                             'iterator', 'comprehension', 'lambda', 'inheritance', 'polymorphism']
+    
+    # Automation keywords - use automation concepts
+    automation_keywords = ['selenium', 'webdriver', 'robot', 'xpath', 'locator', 'browser',
+                           'element', 'wait', 'grid', 'pytest', 'fixture', 'allure', 
+                           'jenkins', 'docker', 'pom', 'page object']
+    
+    is_python_term = topic_lower in python_priority_terms or any(t in python_priority_terms for t in topic_words)
+    is_automation_term = any(kw in topic_lower for kw in automation_keywords)
+    
+    # Check Python CONCEPTS first if it's a common Python term (and not explicitly automation)
+    if is_python_term and not is_automation_term:
+        best_match = None
+        best_score = 0
+        
+        for concept_key in CONCEPTS.keys():
+            score = 0
+            concept_words_list = concept_key.split()
+            
+            if concept_key == topic_lower:
+                score = 100
+            elif concept_key in topic_words:
+                score = 95
+            elif len(concept_words_list) > 1 and concept_key in topic_lower:
+                score = 90
+            elif any(words_match(concept_key, tw) for tw in topic_words):
+                score = 85
+            elif any(concept_key in tw or tw in concept_key for tw in topic_words):
+                score = 70 + len(concept_key)
+            elif concept_key in topic_lower:
+                score = 50 + len(concept_key)
+            
+            if score > best_score:
+                best_score = score
+                best_match = concept_key
+        
+        if best_match and best_score > 0:
+            return CONCEPTS[best_match]
+    
+    # Check automation concepts (Selenium, Robot Framework, etc.)
+    if AUTOMATION_CONCEPTS_AVAILABLE:
+        auto_answer = _match_automation_concept(topic, topic_words)
+        if auto_answer:
+            return auto_answer
+    
+    # Fallback: Find best matching concept from CONCEPTS
     best_match = None
     best_score = 0
     
     for concept_key in CONCEPTS.keys():
         score = 0
-        concept_words = concept_key.split()
+        concept_words_list = concept_key.split()
         
-        # Exact match
         if concept_key == topic_lower:
             score = 100
         elif concept_key in topic_words:
             score = 95
-        elif len(concept_words) > 1 and concept_key in topic_lower:
+        elif len(concept_words_list) > 1 and concept_key in topic_lower:
             score = 90
         elif any(words_match(concept_key, tw) for tw in topic_words):
             score = 85
@@ -5814,9 +6014,10 @@ def generate_response(
         return multi_topic_response
     
     # Check for concept explanations (expanded to include more question types)
-    concept_keywords = ["what is", "what are", "explain", "how does", "how do", "tell me about", 
-                       "teach me", "define", "why do we", "why is", "why are", "why use", 
-                       "why should", "why need", "what's", "whats"]
+    concept_keywords = ["what is", "what are", "explain", "how does", "how do", "how to",
+                       "tell me about", "teach me", "define", "why do we", "why is", "why are", 
+                       "why use", "why should", "why need", "what's", "whats", "describe",
+                       "show me", "give me example", "example of"]
     is_concept_question = any(keyword in msg_lower for keyword in concept_keywords)
     
     if is_concept_question:
@@ -5826,13 +6027,27 @@ def generate_response(
         topic = topic.replace("?", "")
         # Remove concept keywords (whole words only)
         import re
-        for keyword in concept_keywords:
+        removal_keywords = concept_keywords + ["use"]  # Also remove common verbs
+        for keyword in removal_keywords:
             topic = re.sub(r'\b' + re.escape(keyword) + r'\b', ' ', topic)
         # Remove articles and prepositions (whole words only)
         for word in ["a", "an", "the", "in", "of", "for"]:
             topic = re.sub(r'\b' + word + r'\b', ' ', topic)
         topic = " ".join(topic.split()).strip()  # Clean up spaces
         topic_words = [w for w in topic.split() if w != "python"]  # Remove "python" for better matching
+        
+        # CHECK AUTOMATION CONCEPTS FIRST if query contains automation-related words
+        automation_priority_words = ['selenium', 'webdriver', 'robot', 'framework', 'pytest', 
+                                     'xpath', 'locator', 'locators', 'browser', 'grid', 'headless',
+                                     'jenkins', 'docker', 'allure', 'fixture', 'fixtures', 'pabot',
+                                     'wait', 'waits', 'element', 'elements', 'css selector',
+                                     'page object', 'pom', 'alert', 'frame', 'iframe']
+        is_automation_query = any(word in msg_lower for word in automation_priority_words)
+        
+        if is_automation_query and AUTOMATION_CONCEPTS_AVAILABLE:
+            auto_match = _match_automation_concept(topic, topic_words)
+            if auto_match:
+                return auto_match
         
         # Helper function to check if words match (including plurals)
         def words_match(word1, word2):
@@ -5881,6 +6096,12 @@ def generate_response(
         
         if best_match and best_score > 0:
             return CONCEPTS[best_match]
+        
+        # Try automation concepts (Selenium, Robot Framework, pytest)
+        if AUTOMATION_CONCEPTS_AVAILABLE:
+            auto_match = _match_automation_concept(topic, topic_words)
+            if auto_match:
+                return auto_match
         
         # If no manual match, try PDF knowledge base
         if PDF_KB_AVAILABLE:
@@ -6008,34 +6229,226 @@ What would you like to know?"""
     return generate_default_response(question, function_name, user_code, user_message)
 
 
-def generate_interview_response(user_message: str, question: str, function_name: str, user_code: str) -> str:
-    """Generate interviewer-style responses."""
+def generate_interview_response(
+    user_message: str, 
+    question: str, 
+    function_name: str, 
+    user_code: str,
+    interview_state: dict = None
+) -> str:
+    """
+    Generate context-aware interviewer-style responses.
+    
+    Uses the interview engine for stateful, stage-aware responses when available,
+    falls back to basic responses otherwise.
+    """
+    
+    # Try to use the interview engine for advanced responses
+    try:
+        from interview_engine import InterviewEngine, InterviewState, InterviewStage
+        
+        # If we have an interview state dict, reconstruct the engine
+        if interview_state and isinstance(interview_state, dict):
+            engine = _get_interview_engine_from_state(interview_state, question, function_name)
+            if engine:
+                return engine.process_response(user_message, user_code)
+    except ImportError:
+        pass
+    
+    # Fallback to enhanced basic interview responses
+    return _generate_basic_interview_response(user_message, question, function_name, user_code)
+
+
+def _get_interview_engine_from_state(state_dict: dict, question: str, function_name: str):
+    """Reconstruct interview engine from session state dict."""
+    try:
+        from interview_engine import (
+            InterviewEngine, InterviewState, InterviewConfig,
+            InterviewStage, InterviewDifficulty, InterviewType, InterviewScores
+        )
+        
+        # Create config from state
+        config = InterviewConfig(
+            difficulty=InterviewDifficulty(state_dict.get('difficulty', 'mid')),
+            interview_type=InterviewType(state_dict.get('interview_type', 'technical')),
+            time_limit_minutes=state_dict.get('time_limit', 30),
+            show_live_score=state_dict.get('show_live_score', False),
+        )
+        
+        # Create state
+        state = InterviewState(config=config)
+        state.problem_name = question
+        state.function_name = function_name
+        
+        # Restore stage
+        stage_value = state_dict.get('current_stage', 'intro')
+        state.current_stage = InterviewStage(stage_value)
+        
+        # Restore conversation history
+        state.conversation_history = state_dict.get('conversation_history', [])
+        
+        # Restore tracking flags
+        state.user_mentioned_complexity = state_dict.get('user_mentioned_complexity', False)
+        state.user_mentioned_edge_cases = state_dict.get('user_mentioned_edge_cases', False)
+        state.user_asked_clarifying = state_dict.get('user_asked_clarifying', False)
+        state.user_explained_approach = state_dict.get('user_explained_approach', False)
+        state.code_attempts = state_dict.get('code_attempts', 0)
+        state.asked_questions = state_dict.get('asked_questions', [])
+        
+        # Restore scores
+        scores_dict = state_dict.get('scores', {})
+        state.scores = InterviewScores(
+            problem_solving=scores_dict.get('problem_solving', 0),
+            communication=scores_dict.get('communication', 0),
+            code_quality=scores_dict.get('code_quality', 0),
+            complexity_analysis=scores_dict.get('complexity_analysis', 0),
+        )
+        
+        return InterviewEngine(state)
+    except Exception:
+        return None
+
+
+def _generate_basic_interview_response(
+    user_message: str, 
+    question: str, 
+    function_name: str, 
+    user_code: str
+) -> str:
+    """Generate basic interview responses without the full engine."""
     
     msg_lower = user_message.lower()
     
-    # If they're asking a question, redirect to interviewing them
-    if "?" in user_message:
-        return random.choice([
-            "Good question! But let me ask you first - can you explain your thought process for this problem?",
-            "I'd like you to think through that yourself. What's your initial approach?",
-            "Let's explore that together. What have you considered so far?",
-        ])
+    # Analyze what the user has mentioned
+    mentioned_complexity = any(p in msg_lower for p in [
+        'o(', 'time complexity', 'space complexity', 'linear', 'quadratic', 'big o'
+    ])
+    mentioned_edge_cases = any(p in msg_lower for p in [
+        'edge case', 'empty', 'null', 'none', 'negative', 'zero', 'boundary'
+    ])
+    has_substantial_code = user_code and len(user_code.strip()) > 100 and 'def ' in user_code
+    asking_question = '?' in user_message
     
-    # Acknowledge their response and follow up
-    followups = [
-        f"Interesting approach. Now, what's the time complexity of your `{function_name}` solution?",
-        "Good start. Can you think of any edge cases that might break your solution?",
-        "I see. How would you handle an empty input?",
-        "That makes sense. Is there a way to optimize the space complexity?",
-        "Got it. Can you walk me through what happens when the input is [1, 2, 3]?",
-        f"Okay. What data structure did you choose for `{function_name}` and why?",
-        "Understood. What's the worst-case scenario for your solution?",
-        "Right. How would you test this to ensure it's correct?",
-        "I see your point. What alternative approaches did you consider?",
-        "Good. Now, can you identify any potential bugs in your current code?",
+    # If they're asking a question, redirect appropriately
+    if asking_question:
+        redirect_responses = [
+            "Good question! But let me hear your thoughts first - what's your initial approach to this problem?",
+            "I'd like you to think through that. What have you considered so far?",
+            "Let's explore that together. Walk me through your thinking.",
+            "That's something worth discussing. But first, how would you break down this problem?",
+        ]
+        return random.choice(redirect_responses)
+    
+    # Context-aware follow-ups based on what they've mentioned
+    followups = []
+    
+    if has_substantial_code:
+        if not mentioned_complexity:
+            followups.extend([
+                f"I see you've written some code. What's the time complexity of your `{function_name}` solution?",
+                "Good progress on the code. Can you analyze the space complexity?",
+                f"Walk me through your `{function_name}` implementation. What's the Big O?",
+            ])
+        elif not mentioned_edge_cases:
+            followups.extend([
+                "Your complexity analysis is good. Now, what edge cases should we consider?",
+                "How would your solution handle an empty input?",
+                "What happens if the input contains duplicates?",
+            ])
+        else:
+            followups.extend([
+                "Excellent analysis! Is there a way to optimize this further?",
+                "Can you think of an alternative approach that might be more efficient?",
+                "What trade-offs did you consider in your implementation?",
+            ])
+    else:
+        # They haven't written much code yet
+        if not any(p in msg_lower for p in ['approach', 'plan', 'strategy', 'first', 'step']):
+            followups.extend([
+                "Before we dive into code, walk me through your approach.",
+                "How would you break down this problem? What's the first step?",
+                f"What algorithm or technique do you think would work well for `{function_name}`?",
+            ])
+        else:
+            followups.extend([
+                "Good approach! Go ahead and start implementing. Talk me through your code as you write it.",
+                "That sounds reasonable. Let's see how you'd translate that into code.",
+                "I like your thinking. What data structure would you use?",
+            ])
+    
+    # Add some variety with general probing questions
+    general_followups = [
+        f"What's the expected behavior of `{function_name}` for edge cases?",
+        "How would you test this to make sure it works correctly?",
+        "What would you do differently if performance was critical?",
+        "Can you identify any potential bugs in your current approach?",
     ]
     
-    return random.choice(followups)
+    # Select from appropriate pool
+    if followups:
+        return random.choice(followups)
+    return random.choice(general_followups)
+
+
+def get_interview_state_dict(engine) -> dict:
+    """Convert interview engine state to a serializable dict for session storage."""
+    try:
+        state = engine.state
+        return {
+            'difficulty': state.config.difficulty.value,
+            'interview_type': state.config.interview_type.value,
+            'time_limit': state.config.time_limit_minutes,
+            'show_live_score': state.config.show_live_score,
+            'current_stage': state.current_stage.value,
+            'conversation_history': state.conversation_history,
+            'user_mentioned_complexity': state.user_mentioned_complexity,
+            'user_mentioned_edge_cases': state.user_mentioned_edge_cases,
+            'user_asked_clarifying': state.user_asked_clarifying,
+            'user_explained_approach': state.user_explained_approach,
+            'code_attempts': state.code_attempts,
+            'asked_questions': state.asked_questions,
+            'scores': {
+                'problem_solving': state.scores.problem_solving,
+                'communication': state.scores.communication,
+                'code_quality': state.scores.code_quality,
+                'complexity_analysis': state.scores.complexity_analysis,
+            },
+            'start_time': state.start_time.isoformat() if state.start_time else None,
+        }
+    except Exception:
+        return {}
+
+
+def generate_interview_feedback_summary(interview_state: dict) -> str:
+    """Generate a comprehensive feedback summary for a completed interview."""
+    try:
+        from interview_engine import InterviewEngine
+        
+        engine = _get_interview_engine_from_state(interview_state, "", "")
+        if engine:
+            return engine.force_end_interview()
+    except ImportError:
+        pass
+    
+    # Fallback basic feedback
+    scores = interview_state.get('scores', {})
+    total = sum(scores.values()) / 4 if scores else 0
+    
+    return f"""## 📊 Interview Summary
+
+**Estimated Score:** {total:.0f}/100
+
+### Areas Covered:
+- Complexity Analysis: {'✓' if interview_state.get('user_mentioned_complexity') else '✗'}
+- Edge Cases: {'✓' if interview_state.get('user_mentioned_edge_cases') else '✗'}
+- Clear Approach: {'✓' if interview_state.get('user_explained_approach') else '✗'}
+
+### Tips for Improvement:
+1. Always discuss time and space complexity
+2. Consider edge cases before coding
+3. Think out loud - communication matters!
+
+Keep practicing! 🚀"""
 
 
 def generate_hint_response(question: str, function_name: str, user_code: str) -> str:

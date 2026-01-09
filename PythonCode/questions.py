@@ -31,8 +31,39 @@ ALL_TAGS = [
     "dynamic-programming",
     "bit-manipulation",
     "heap",
-    "matrix"
+    "matrix",
+    # Automation tags
+    "Selenium",
+    "WebDriver",
+    "Locators",
+    "Waits",
+    "Page Object Model",
+    "Robot Framework",
+    "Keywords",
+    "pytest",
+    "Fixtures",
 ]
+
+# Import automation questions (optional)
+AUTOMATION_QUESTIONS_AVAILABLE = False
+AUTOMATION_QUESTIONS = {}
+
+try:
+    from automation_questions import (
+        SELENIUM_QUESTIONS,
+        ROBOT_FRAMEWORK_QUESTIONS,
+        PYTEST_QUESTIONS,
+        AUTOMATION_QUESTIONS as AUTO_Q,
+        AUTOMATION_QUESTION_TAGS
+    )
+    AUTOMATION_QUESTIONS_AVAILABLE = True
+    AUTOMATION_QUESTIONS = AUTO_Q
+    # Add automation tags to ALL_TAGS
+    for tag in AUTOMATION_QUESTION_TAGS:
+        if tag not in ALL_TAGS:
+            ALL_TAGS.append(tag)
+except ImportError:
+    pass
 
 QUESTIONS = {
 
@@ -3596,6 +3627,14 @@ def get_questions_by_tag(tag: str) -> list:
         for idx, q in enumerate(questions):
             if tag in q.get("tags", []):
                 results.append((stage, idx, q))
+    
+    # Also search automation questions
+    if AUTOMATION_QUESTIONS_AVAILABLE:
+        for stage, questions in AUTOMATION_QUESTIONS.items():
+            for idx, q in enumerate(questions):
+                if tag in q.get("tags", []):
+                    results.append((f"Automation-{stage}", idx, q))
+    
     return results
 
 
@@ -3609,4 +3648,27 @@ def count_questions_by_tag() -> dict:
         for q in questions:
             for tag in q.get("tags", []):
                 counts[tag] = counts.get(tag, 0) + 1
+    
+    # Also count automation questions
+    if AUTOMATION_QUESTIONS_AVAILABLE:
+        for stage, questions in AUTOMATION_QUESTIONS.items():
+            for q in questions:
+                for tag in q.get("tags", []):
+                    counts[tag] = counts.get(tag, 0) + 1
+    
     return counts
+
+
+def get_automation_questions() -> dict:
+    """Return automation questions dictionary."""
+    if AUTOMATION_QUESTIONS_AVAILABLE:
+        return AUTOMATION_QUESTIONS
+    return {}
+
+
+def get_all_questions() -> dict:
+    """Return combined Python and automation questions."""
+    all_q = dict(QUESTIONS)
+    if AUTOMATION_QUESTIONS_AVAILABLE:
+        all_q.update(AUTOMATION_QUESTIONS)
+    return all_q
