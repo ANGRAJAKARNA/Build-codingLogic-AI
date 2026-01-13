@@ -1,7 +1,7 @@
 # main.py
 """
 PyCode - AI-Powered Python Coding Challenge Platform
-Phone-Style UI with Practice, Interview, and AI Chat
+2-Panel Phone UI with AI Chat Modal
 """
 
 import streamlit as st
@@ -48,236 +48,599 @@ from builtin_assistant import (
 
 st.set_page_config(page_title="PyCode AI", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
 
-# CSS Styles
+# CSS Styles - Futuristic Neon Cyber Design
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-:root {
-    --bg: #0c1929;
-    --cyan: #00e5ff;
-    --purple: #bf5af2;
-    --coral: #ff453a;
-    --green: #30d158;
-    --yellow: #ffd60a;
-    --text: #ffffff;
-    --text-dim: #9ca3af;
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    
+    :root {
+    --bg-deep: #030508;
+    --bg-dark: #0a0f1a;
+    --bg-card: rgba(10, 20, 40, 0.85);
+    --neon-cyan: #00f5ff;
+    --neon-purple: #bf00ff;
+    --neon-pink: #ff00aa;
+    --neon-green: #00ff88;
+    --neon-orange: #ff6b00;
+    --text: #e8f4f8;
+    --text-dim: #8fa3b8;
+    --text-muted: #4a6380;
+    --glass: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
 }
 
-#MainMenu, footer, header, [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stSidebar"] { display: none !important; }
+#MainMenu, footer, [data-testid="stToolbar"], [data-testid="stDecoration"] { display: none !important; }
+[data-testid="stSidebar"] { display: none !important; }
 
-.stApp { background: linear-gradient(160deg, #050a12 0%, #0a1020 50%, #060d18 100%) !important; }
-.main .block-container { padding: 0.5rem 2rem !important; max-width: 100% !important; }
-* { font-family: 'Inter', sans-serif; }
+/* ========== ANIMATED BACKGROUND ========== */
+.stApp { 
+    background: 
+        radial-gradient(ellipse at 20% 80%, rgba(0, 245, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(191, 0, 255, 0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(0, 255, 136, 0.03) 0%, transparent 60%),
+        linear-gradient(180deg, #030508 0%, #0a0f1a 50%, #050810 100%) !important;
+    color: var(--text) !important;
+    min-height: 100vh;
+}
 
-/* PHONE 1 - PROBLEMS (CYAN/TEAL THEME) */
+.main .block-container { 
+    padding: 0.8rem 2rem !important; 
+    max-width: 100% !important; 
+}
+
+* { font-family: 'Rajdhani', -apple-system, sans-serif !important; }
+.stApp *, [data-testid="stVerticalBlock"], .stMarkdown, p, span, div { color: var(--text) !important; }
+
+/* ========== FUTURISTIC CARD 1 - Problems ========== */
 [data-testid="column"]:nth-child(1) > div:first-child {
-    background: linear-gradient(180deg, #0a1a24 0%, #051015 50%, #020a0f 100%);
-    border: 5px solid;
-    border-image: linear-gradient(180deg, #00e5ff 0%, #00b8d4 50%, #006064 100%) 1;
-    border-radius: 45px;
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.05) 0%, rgba(8, 16, 32, 0.98) 50%, rgba(0, 255, 136, 0.03) 100%) !important;
+    border: 2px solid rgba(0, 245, 255, 0.35) !important;
+    -webkit-border-radius: 20px !important;
+    border-radius: 20px !important;
+    padding: 20px !important;
+    min-height: 700px;
+    margin: 0 10px;
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    -webkit-box-shadow: 
+        0 0 50px rgba(0, 245, 255, 0.2),
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(0, 245, 255, 0.15),
+        inset 0 0 30px rgba(0, 245, 255, 0.03);
     box-shadow: 
-        0 0 50px rgba(0, 229, 255, 0.5),
-        0 0 100px rgba(0, 229, 255, 0.25),
-        inset 0 0 40px rgba(0, 229, 255, 0.1),
-        0 10px 40px rgba(0, 0, 0, 0.5);
-    padding: 22px 18px !important;
-    min-height: 680px;
-    margin: 0 12px;
+        0 0 50px rgba(0, 245, 255, 0.2),
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(0, 245, 255, 0.15),
+        inset 0 0 30px rgba(0, 245, 255, 0.03) !important;
     position: relative;
     overflow: hidden;
 }
 
-[data-testid="column"]:nth-child(1) > div:first-child::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: linear-gradient(180deg, rgba(0, 229, 255, 0.08) 0%, transparent 100%);
-    pointer-events: none;
-}
-
-/* PHONE 2 - CODE EDITOR (PURPLE/VIOLET THEME) */
+/* ========== FUTURISTIC CARD 2 - Editor ========== */
 [data-testid="column"]:nth-child(2) > div:first-child {
-    background: linear-gradient(180deg, #150a20 0%, #0d0518 50%, #08030f 100%);
-    border: 5px solid;
-    border-image: linear-gradient(180deg, #bf5af2 0%, #9945ff 50%, #5b21b6 100%) 1;
-    border-radius: 45px;
+    background: linear-gradient(135deg, rgba(191, 0, 255, 0.05) 0%, rgba(8, 16, 32, 0.98) 50%, rgba(255, 0, 170, 0.03) 100%) !important;
+    border: 2px solid rgba(191, 0, 255, 0.35) !important;
+    -webkit-border-radius: 20px !important;
+    border-radius: 20px !important;
+    padding: 20px !important;
+    min-height: 700px;
+    margin: 0 10px;
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    -webkit-box-shadow: 
+        0 0 50px rgba(191, 0, 255, 0.2),
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(191, 0, 255, 0.15),
+        inset 0 0 30px rgba(191, 0, 255, 0.03);
     box-shadow: 
-        0 0 50px rgba(191, 90, 242, 0.5),
-        0 0 100px rgba(191, 90, 242, 0.25),
-        inset 0 0 40px rgba(191, 90, 242, 0.1),
-        0 10px 40px rgba(0, 0, 0, 0.5);
-    padding: 22px 18px !important;
-    min-height: 680px;
-    margin: 0 12px;
+        0 0 50px rgba(191, 0, 255, 0.2),
+        0 20px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(191, 0, 255, 0.15),
+        inset 0 0 30px rgba(191, 0, 255, 0.03) !important;
     position: relative;
     overflow: hidden;
 }
 
-[data-testid="column"]:nth-child(2) > div:first-child::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: linear-gradient(180deg, rgba(191, 90, 242, 0.08) 0%, transparent 100%);
-    pointer-events: none;
+@keyframes scanline {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 
-/* PHONE 3 - AI CHAT (CORAL/ORANGE THEME) */
-[data-testid="column"]:nth-child(3) > div:first-child {
-    background: linear-gradient(180deg, #1a0a08 0%, #150505 50%, #0f0303 100%);
-    border: 5px solid;
-    border-image: linear-gradient(180deg, #ff453a 0%, #ff6b6b 50%, #b91c1c 100%) 1;
-    border-radius: 45px;
-    box-shadow: 
-        0 0 50px rgba(255, 69, 58, 0.5),
-        0 0 100px rgba(255, 69, 58, 0.25),
-        inset 0 0 40px rgba(255, 69, 58, 0.1),
-        0 10px 40px rgba(0, 0, 0, 0.5);
-    padding: 22px 18px !important;
-    min-height: 680px;
-    margin: 0 12px;
+/* ========== HEADER STYLES ========== */
+.card-header { 
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    margin-bottom: 18px; 
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(0, 245, 255, 0.15);
+}
+.card-title { 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 1.3rem; 
+        font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
+}
+.card-badge {
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    background: rgba(0, 245, 255, 0.1);
+    color: var(--neon-cyan);
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    text-shadow: 0 0 10px var(--neon-cyan);
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(0, 245, 255, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(0, 245, 255, 0.5), 0 0 30px rgba(0, 245, 255, 0.2); }
+}
+
+/* ========== CYBER STATS ========== */
+.stats-row { display: flex; gap: 12px; margin-bottom: 18px; }
+.stat-card {
+    flex: 1; 
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.05) 0%, rgba(0, 20, 40, 0.8) 100%);
+    border: 1px solid rgba(0, 245, 255, 0.2);
+    border-radius: 12px;
+    padding: 16px 12px; 
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.stat-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 30px rgba(0, 245, 255, 0.3), inset 0 0 20px rgba(0, 245, 255, 0.05);
+}
+.stat-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+}
+.stat-num { 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 2.2rem; 
+    font-weight: 800; 
+    background: linear-gradient(180deg, #fff 0%, var(--neon-cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 40px rgba(0, 245, 255, 0.8);
+}
+    .stat-label {
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 9px; 
+    color: var(--text-dim); 
+        text-transform: uppercase;
+    letter-spacing: 2px; 
+    margin-top: 8px; 
+}
+
+/* ========== SECTION TITLES ========== */
+.section-title { 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 3px; 
+    margin: 20px 0 12px; 
+    padding: 8px 0 8px 14px; 
+    border-left: 3px solid;
+    color: var(--text-dim);
+    background: linear-gradient(90deg, rgba(0, 245, 255, 0.05) 0%, transparent 100%);
+}
+.sec-cyan { border-left-color: var(--neon-cyan); color: var(--neon-cyan); }
+.sec-purple { border-left-color: var(--neon-purple); color: var(--neon-purple); }
+.sec-coral { border-left-color: var(--neon-pink); color: var(--neon-pink); }
+
+/* ========== QUESTION CARDS ========== */
+.q-card { 
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.02) 0%, rgba(10, 15, 30, 0.9) 100%);
+    border: 1px solid rgba(0, 245, 255, 0.1); 
+    border-radius: 10px; 
+    padding: 14px 16px; 
+    margin-bottom: 10px; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
-
-[data-testid="column"]:nth-child(3) > div:first-child::before {
+.q-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: linear-gradient(180deg, rgba(255, 69, 58, 0.08) 0%, transparent 100%);
-    pointer-events: none;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, var(--neon-cyan), var(--neon-green));
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+.q-card:hover { 
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.08) 0%, rgba(10, 20, 40, 0.95) 100%);
+    border-color: rgba(0, 245, 255, 0.3);
+    transform: translateX(8px);
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.15);
+}
+.q-card:hover::before { opacity: 1; }
+.q-card-active { 
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(10, 20, 40, 0.95) 100%) !important;
+    border-color: var(--neon-green) !important;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.2) !important;
+}
+.q-header { display: flex; align-items: center; gap: 14px; }
+.q-icon { 
+    width: 32px; 
+    height: 32px; 
+    border-radius: 6px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 12px;
+    font-weight: 700;
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.2) 0%, rgba(0, 255, 136, 0.1) 100%);
+    color: var(--neon-cyan);
+    border: 1px solid rgba(0, 245, 255, 0.3);
+    text-shadow: 0 0 10px var(--neon-cyan);
+}
+.q-title { flex: 1; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-tags { font-size: 10px; color: var(--text-muted); margin-top: 6px; letter-spacing: 0.5px; }
+
+/* ========== PROBLEM BOX ========== */
+.problem-box { 
+    background: linear-gradient(135deg, rgba(191, 0, 255, 0.05) 0%, rgba(10, 15, 30, 0.9) 100%);
+    border: 1px solid rgba(191, 0, 255, 0.2); 
+    border-radius: 14px;
+    padding: 18px; 
+    margin-bottom: 16px;
+    position: relative;
+}
+.problem-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 20px; right: 20px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(191, 0, 255, 0.5), transparent);
+}
+.problem-title { font-size: 1rem; font-weight: 600; margin-bottom: 14px; line-height: 1.5; }
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge { 
+    padding: 5px 14px; 
+    border-radius: 4px; 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 9px; 
+    font-weight: 600; 
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+.b-easy { 
+    background: rgba(0, 255, 136, 0.1); 
+    color: var(--neon-green); 
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+.b-med { 
+    background: rgba(255, 107, 0, 0.1); 
+    color: var(--neon-orange); 
+    border: 1px solid rgba(255, 107, 0, 0.3);
+    text-shadow: 0 0 10px rgba(255, 107, 0, 0.5);
+}
+.b-hard { 
+    background: rgba(255, 0, 170, 0.1); 
+    color: var(--neon-pink); 
+    border: 1px solid rgba(255, 0, 170, 0.3);
+    text-shadow: 0 0 10px rgba(255, 0, 170, 0.5);
+}
+.b-tag { 
+    background: rgba(0, 245, 255, 0.08); 
+    color: var(--neon-cyan); 
+    border: 1px solid rgba(0, 245, 255, 0.2); 
 }
 
-/* Notch Styles with different colors per phone */
-.notch { width: 110px; height: 30px; background: #000; border-radius: 15px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); }
-.notch-cam { width: 10px; height: 10px; background: #1a2030; border-radius: 50%; border: 2px solid #2a2a40; }
-.notch-led { width: 6px; height: 6px; background: var(--green); border-radius: 50%; box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+/* ========== CODE EDITOR ========== */
+.editor-box { 
+    background: rgba(5, 10, 20, 0.9); 
+    border: 1px solid rgba(191, 0, 255, 0.2); 
+        border-radius: 12px;
+        overflow: hidden;
+    margin-bottom: 14px;
+    }
+.editor-header { 
+    background: linear-gradient(90deg, rgba(191, 0, 255, 0.1) 0%, rgba(10, 15, 30, 0.9) 100%);
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    border-bottom: 1px solid rgba(191, 0, 255, 0.15);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+.d-r { background: #ff4757; color: #ff4757; }
+.d-y { background: #ffa502; color: #ffa502; }
+.d-g { background: #2ed573; color: #2ed573; }
+.editor-file { 
+    margin-left: 14px; 
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 11px; 
+    color: var(--neon-purple); 
+    letter-spacing: 1px;
+}
 
-/* Status bar with unique bottom borders per phone */
-.status-bar { display: flex; justify-content: space-between; padding: 0 10px 12px; font-size: 11px; font-weight: 600; color: var(--text); margin-bottom: 14px; }
-.status-bar-cyan { border-bottom: 2px solid rgba(0, 229, 255, 0.4); }
-.status-bar-purple { border-bottom: 2px solid rgba(191, 90, 242, 0.4); }
-.status-bar-coral { border-bottom: 2px solid rgba(255, 69, 58, 0.4); }
+.timer { 
+    text-align: center; 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 1.6rem; 
+    font-weight: 700; 
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 30px rgba(0, 245, 255, 0.5);
+    padding: 12px 0;
+    letter-spacing: 4px;
+}
 
-/* Phone headers with enhanced styling */
-.phone-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; }
-.phone-header-cyan { border-bottom: 1px solid rgba(0, 229, 255, 0.2); }
-.phone-header-purple { border-bottom: 1px solid rgba(191, 90, 242, 0.2); }
-.phone-header-coral { border-bottom: 1px solid rgba(255, 69, 58, 0.2); }
+/* ========== WELCOME SCREEN ========== */
+.welcome { text-align: center; padding: 50px 24px; }
+.welcome-icon { 
+    width: 100px; 
+    height: 100px; 
+    border-radius: 20px; 
+    margin: 0 auto 30px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, rgba(191, 0, 255, 0.2) 0%, rgba(0, 245, 255, 0.1) 100%);
+    border: 2px solid;
+    border-image: linear-gradient(135deg, var(--neon-purple), var(--neon-cyan)) 1;
+    color: var(--neon-purple);
+    text-shadow: 0 0 20px var(--neon-purple);
+    animation: float 3s ease-in-out infinite, glow-rotate 4s linear infinite;
+    box-shadow: 0 0 40px rgba(191, 0, 255, 0.3);
+}
+@keyframes glow-rotate {
+    0%, 100% { box-shadow: 0 0 40px rgba(191, 0, 255, 0.4), 0 0 80px rgba(0, 245, 255, 0.1); }
+    50% { box-shadow: 0 0 60px rgba(0, 245, 255, 0.4), 0 0 100px rgba(191, 0, 255, 0.1); }
+}
+.welcome-title { 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 1.5rem; 
+    font-weight: 700; 
+    line-height: 1.4; 
+    margin-bottom: 14px;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--text), var(--neon-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.welcome-sub { color: var(--text-dim); font-size: 13px; line-height: 1.7; max-width: 300px; margin: 0 auto; }
 
-.phone-title { font-size: 1.5rem; font-weight: 800; text-shadow: 0 0 20px currentColor; }
-.title-cyan { color: var(--cyan); text-shadow: 0 0 30px rgba(0, 229, 255, 0.6); }
-.title-purple { color: var(--purple); text-shadow: 0 0 30px rgba(191, 90, 242, 0.6); }
-.title-coral { color: var(--coral); text-shadow: 0 0 30px rgba(255, 69, 58, 0.6); }
+/* ========== TEXT INPUTS ========== */
+    .stTextArea textarea {
+        font-family: 'JetBrains Mono', monospace !important;
+    font-size: 13px !important; 
+    background: rgba(5, 10, 20, 0.8) !important; 
+    color: var(--neon-green) !important; 
+    border: 1px solid rgba(0, 255, 136, 0.2) !important; 
+    border-radius: 10px !important;
+    caret-color: var(--neon-green) !important;
+}
+.stTextArea textarea:focus {
+    border-color: var(--neon-green) !important;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2), inset 0 0 20px rgba(0, 255, 136, 0.02) !important;
+}
+.stTextInput input { 
+    background: rgba(10, 15, 30, 0.8) !important; 
+    border: 1px solid rgba(0, 245, 255, 0.2) !important; 
+    border-radius: 10px !important; 
+        font-size: 14px !important;
+    padding: 14px 16px !important;
+    color: var(--text) !important;
+}
+.stTextInput input:focus { 
+    border-color: var(--neon-cyan) !important; 
+    box-shadow: 0 0 25px rgba(0, 245, 255, 0.2), inset 0 0 15px rgba(0, 245, 255, 0.02) !important;
+}
 
-.avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-.av-cyan { background: linear-gradient(135deg, #00e5ff, #00b8d4); box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4); }
-.av-purple { background: linear-gradient(135deg, #bf5af2, #9945ff); box-shadow: 0 4px 20px rgba(191, 90, 242, 0.4); }
-.av-coral { background: linear-gradient(135deg, #ff453a, #ff6b6b); box-shadow: 0 4px 20px rgba(255, 69, 58, 0.4); }
+/* ========== CYBER BUTTONS ========== */
+    .stButton > button {
+    font-family: 'Orbitron', sans-serif !important;
+    font-weight: 600 !important; 
+    font-size: 12px !important; 
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+    border-radius: 8px !important; 
+    padding: 14px 24px !important; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+.stButton > button::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important; left: -100% !important;
+    width: 100% !important; height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent) !important;
+    transition: left 0.5s !important;
+}
+.stButton > button:hover::before { left: 100% !important; }
+.stButton > button:hover { transform: translateY(-3px) !important; }
 
-/* Stats row with cyan theme */
-.stats-row { display: flex; gap: 10px; margin-bottom: 14px; }
-.stat-card { flex: 1; background: linear-gradient(180deg, rgba(0, 229, 255, 0.12) 0%, rgba(0, 229, 255, 0.04) 100%); border: 1px solid rgba(0, 229, 255, 0.35); border-radius: 16px; padding: 14px 10px; text-align: center; backdrop-filter: blur(10px); }
-.stat-num { font-size: 1.7rem; font-weight: 800; color: var(--cyan); text-shadow: 0 0 15px rgba(0, 229, 255, 0.5); }
-.stat-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; }
+/* Primary Button - Neon Green */
+.stButton > button[kind="primary"] { 
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.9) 0%, rgba(0, 200, 100, 0.9) 100%) !important; 
+    color: #030508 !important;
+    border: none !important;
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 255, 255, 0.1) !important;
+}
+.stButton > button[kind="primary"]:hover {
+    box-shadow: 0 0 50px rgba(0, 255, 136, 0.6), 0 10px 40px rgba(0, 255, 136, 0.3) !important;
+}
 
-/* Section titles with enhanced styling */
-.section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin: 14px 0 10px; padding-left: 8px; border-left: 3px solid; }
-.sec-cyan { color: var(--cyan); border-left-color: var(--cyan); }
-.sec-purple { color: var(--purple); border-left-color: var(--purple); }
-.sec-coral { color: var(--coral); border-left-color: var(--coral); }
+/* Secondary Button */
+.stButton > button[kind="secondary"] { 
+    background: transparent !important; 
+    border: 1px solid rgba(0, 245, 255, 0.4) !important; 
+    color: var(--neon-cyan) !important;
+}
+.stButton > button[kind="secondary"]:hover {
+    background: rgba(0, 245, 255, 0.1) !important;
+    border-color: var(--neon-cyan) !important;
+    box-shadow: 0 0 30px rgba(0, 245, 255, 0.3), inset 0 0 15px rgba(0, 245, 255, 0.05) !important;
+}
 
-/* Question cards with cyan theme */
-.q-card { background: linear-gradient(135deg, rgba(0, 229, 255, 0.08) 0%, rgba(0, 229, 255, 0.02) 100%); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; transition: all 0.25s ease; }
-.q-card:hover { background: linear-gradient(135deg, rgba(0, 229, 255, 0.15) 0%, rgba(0, 229, 255, 0.06) 100%); border-color: var(--cyan); transform: translateX(5px); box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2); }
-.q-card-active { background: linear-gradient(135deg, rgba(0, 229, 255, 0.2) 0%, rgba(0, 229, 255, 0.1) 100%) !important; border-color: var(--cyan) !important; box-shadow: 0 0 20px rgba(0, 229, 255, 0.3) !important; }
-.q-header { display: flex; align-items: center; gap: 10px; }
-.q-icon { font-size: 18px; }
-.q-title { flex: 1; font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.q-tags { font-size: 10px; color: var(--cyan); margin-top: 4px; opacity: 0.85; }
+/* Ensure button labels inherit the neon colors */
+.stButton > button div[data-testid="stMarkdownContainer"],
+.stButton > button p {
+    color: inherit !important;
+}
+.stButton > button[kind="secondary"] div[data-testid="stMarkdownContainer"],
+.stButton > button[kind="secondary"] p {
+    color: var(--neon-cyan) !important;
+}
+.stButton > button[kind="primary"] div[data-testid="stMarkdownContainer"],
+.stButton > button[kind="primary"] p {
+    color: #030508 !important;
+}
 
-/* Problem box with purple theme */
-.problem-box { background: linear-gradient(135deg, rgba(191, 90, 242, 0.12) 0%, rgba(191, 90, 242, 0.04) 100%); border: 2px solid rgba(191, 90, 242, 0.4); border-radius: 18px; padding: 16px; margin-bottom: 12px; box-shadow: inset 0 0 20px rgba(191, 90, 242, 0.05); }
-.problem-title { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 8px; line-height: 1.3; }
-.badges { display: flex; gap: 5px; flex-wrap: wrap; }
-.badge { padding: 4px 10px; border-radius: 16px; font-size: 10px; font-weight: 600; }
-.b-easy { background: rgba(48, 209, 88, 0.2); color: var(--green); border: 1px solid rgba(48, 209, 88, 0.4); }
-.b-med { background: rgba(255, 214, 10, 0.2); color: var(--yellow); border: 1px solid rgba(255, 214, 10, 0.4); }
-.b-hard { background: rgba(255, 69, 58, 0.2); color: var(--coral); border: 1px solid rgba(255, 69, 58, 0.4); }
-.b-tag { background: rgba(191, 90, 242, 0.15); color: #d8b4fe; border: 1px solid rgba(191, 90, 242, 0.3); }
+/* ========== PROGRESS BAR ========== */
+.stProgress > div > div { 
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green), var(--neon-cyan)) !important;
+    background-size: 200% 100% !important;
+    animation: progress-glow 2s linear infinite !important;
+    border-radius: 4px !important;
+    box-shadow: 0 0 15px var(--neon-cyan) !important;
+}
+@keyframes progress-glow {
+    0% { background-position: 0% 0%; }
+    100% { background-position: 200% 0%; }
+}
+.stProgress > div{ 
+    background: rgba(0, 245, 255, 0.1) !important; 
+    border-radius: 4px !important; 
+    height: 8px !important;
+    border: 1px solid rgba(0, 245, 255, 0.2) !important;
+}
 
-.editor-box { background: #080a0f; border: 1px solid rgba(191, 90, 242, 0.3); border-radius: 12px; overflow: hidden; margin-bottom: 10px; }
-.editor-header { background: rgba(191, 90, 242, 0.1); padding: 8px 12px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(191, 90, 242, 0.2); }
-.dot { width: 10px; height: 10px; border-radius: 50%; }
-.d-r { background: #ff5f57; }
-.d-y { background: #febc2e; }
-.d-g { background: #28c840; }
-.editor-file { margin-left: 10px; font-size: 11px; color: #d8b4fe; font-family: 'JetBrains Mono', monospace; }
+/* ========== MESSAGES ========== */
+.msg-ok { 
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.1) 0%, rgba(10, 20, 40, 0.9) 100%);
+    border: 1px solid rgba(0, 255, 136, 0.3); 
+    border-radius: 10px; 
+    padding: 14px 18px; 
+    color: var(--neon-green); 
+    margin: 12px 0;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.1);
+}
+.msg-err { 
+    background: linear-gradient(135deg, rgba(255, 0, 170, 0.1) 0%, rgba(10, 20, 40, 0.9) 100%);
+    border: 1px solid rgba(255, 0, 170, 0.3);
+    border-radius: 10px; 
+    padding: 14px 18px; 
+    color: var(--neon-pink); 
+    margin: 12px 0;
+    box-shadow: 0 0 20px rgba(255, 0, 170, 0.1);
+}
+.msg-hint { 
+    background: linear-gradient(135deg, rgba(0, 245, 255, 0.1) 0%, rgba(10, 20, 40, 0.9) 100%);
+    border: 1px solid rgba(0, 245, 255, 0.3); 
+    border-radius: 10px; 
+    padding: 14px 18px; 
+    margin: 12px 0; 
+    color: var(--neon-cyan);
+    box-shadow: 0 0 20px rgba(0, 245, 255, 0.1);
+}
 
-.timer { text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; color: #d8b4fe; padding: 6px 0; }
+/* ========== TEST CASES ========== */
+.test-case { 
+    background: rgba(10, 15, 30, 0.8);
+    border: 1px solid rgba(0, 245, 255, 0.15); 
+        border-radius: 8px;
+    padding: 12px 16px; 
+    margin: 8px 0; 
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 12px;
+}
+.test-lbl { color: var(--neon-cyan); font-weight: 600; }
 
-/* Welcome screens with enhanced theming */
-.welcome { text-align: center; padding: 30px 15px; }
-.welcome-icon { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 44px; animation: float 3s ease-in-out infinite; }
-.w-purple { background: linear-gradient(135deg, #bf5af2, #9945ff); box-shadow: 0 15px 50px rgba(191, 90, 242, 0.5), 0 0 80px rgba(191, 90, 242, 0.2); }
-.w-coral { background: linear-gradient(135deg, #ff453a, #ff6b6b); box-shadow: 0 15px 50px rgba(255, 69, 58, 0.5), 0 0 80px rgba(255, 69, 58, 0.2); }
-.w-cyan { background: linear-gradient(135deg, #00e5ff, #00b8d4); box-shadow: 0 15px 50px rgba(0, 229, 255, 0.5), 0 0 80px rgba(0, 229, 255, 0.2); }
-.welcome-title { font-size: 1.5rem; font-weight: 700; color: var(--text); line-height: 1.35; margin-bottom: 8px; }
-.welcome-sub { color: var(--text-dim); font-size: 13px; }
+/* ========== CHAT MESSAGES ========== */
+.chat-msg { 
+    padding: 14px 18px; 
+    border-radius: 12px; 
+    margin: 10px 0; 
+    max-width: 85%; 
+    font-size: 13px; 
+    line-height: 1.6;
+}
+.chat-msg-user { 
+    background: linear-gradient(135deg, var(--neon-green), rgba(0, 200, 100, 0.9));
+    color: #030508; 
+    margin-left: auto; 
+    border-radius: 12px 12px 4px 12px;
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+}
+.chat-msg-ai { 
+    background: linear-gradient(135deg, rgba(191, 0, 255, 0.1), rgba(10, 20, 40, 0.9));
+    border: 1px solid rgba(191, 0, 255, 0.3); 
+    border-radius: 12px 12px 12px 4px;
+}
 
-/* Chat buttons with coral theme */
-.chat-btns { display: flex; gap: 10px; justify-content: center; margin: 16px 0; }
-.chat-btn { background: linear-gradient(135deg, rgba(255, 69, 58, 0.1) 0%, rgba(255, 69, 58, 0.03) 100%); border: 1px solid rgba(255, 69, 58, 0.35); border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; transition: all 0.2s; }
-.chat-btn:hover { background: linear-gradient(135deg, rgba(255, 69, 58, 0.2) 0%, rgba(255, 69, 58, 0.08) 100%); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255, 69, 58, 0.2); }
-.chat-icon { width: 28px; height: 28px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
-.chat-label { font-size: 12px; font-weight: 600; color: var(--text); }
+/* ========== MODE TOGGLE ========== */
+.stRadio > div {
+    background: rgba(10, 15, 30, 0.8) !important;
+    border: 1px solid rgba(0, 245, 255, 0.2) !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+}
+.stRadio label { 
+    font-family: 'Orbitron', sans-serif !important;
+    font-size: 12px !important;
+    letter-spacing: 1px !important;
+}
 
-/* Chat messages */
-.msg { padding: 12px 16px; border-radius: 18px; margin: 8px 0; max-width: 88%; font-size: 12px; line-height: 1.5; }
-.msg-user { background: linear-gradient(135deg, #ff453a, #ff6b6b); color: white; margin-left: auto; border-radius: 18px 18px 4px 18px; box-shadow: 0 4px 15px rgba(255, 69, 58, 0.3); }
-.msg-ai { background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.03) 100%); border: 1px solid rgba(255, 69, 58, 0.3); color: #e5e7eb; border-radius: 18px 18px 18px 4px; }
+/* ========== SELECTBOX ========== */
+.stSelectbox > div > div {
+    background: rgba(10, 15, 30, 0.9) !important;
+    border: 1px solid rgba(0, 245, 255, 0.2) !important;
+    border-radius: 8px !important;
+}
+.stSelectbox > div > div:hover {
+    border-color: var(--neon-cyan) !important;
+}
 
-/* Text inputs with different theming */
-.stTextArea textarea { font-family: 'JetBrains Mono', monospace !important; font-size: 12px !important; background: #060810 !important; color: #e2e8f0 !important; border: 1px solid rgba(191, 90, 242, 0.25) !important; border-radius: 8px !important; }
-.stTextInput input { background: rgba(255, 255, 255, 0.05) !important; border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 14px !important; color: var(--text) !important; font-size: 13px !important; padding: 12px 16px !important; }
-.stTextInput input:focus { border-color: currentColor !important; box-shadow: 0 0 20px rgba(255, 255, 255, 0.1) !important; }
+/* ========== CONTAINER SCROLLBAR ========== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: rgba(10, 15, 30, 0.5); border-radius: 3px; }
+::-webkit-scrollbar-thumb { 
+    background: linear-gradient(180deg, var(--neon-cyan), var(--neon-purple)); 
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--neon-cyan); }
 
-/* Buttons with enhanced styling */
-.stButton > button { font-weight: 600 !important; border-radius: 12px !important; font-size: 12px !important; padding: 8px 16px !important; transition: all 0.25s ease !important; }
-.stButton > button:hover { transform: translateY(-2px) !important; }
+/* ========== ANIMATIONS ========== */
+@keyframes float { 
+    0%, 100% { transform: translateY(0) rotate(0deg); } 
+    50% { transform: translateY(-10px) rotate(2deg); } 
+}
 
-/* Button styles per column */
-[data-testid="column"]:nth-child(1) .stButton > button[kind="primary"] { background: linear-gradient(135deg, #00e5ff, #00b8d4) !important; border: none !important; box-shadow: 0 4px 15px rgba(0, 229, 255, 0.35) !important; }
-[data-testid="column"]:nth-child(1) .stButton > button[kind="secondary"] { background: rgba(0, 229, 255, 0.1) !important; border: 1px solid rgba(0, 229, 255, 0.4) !important; color: var(--cyan) !important; }
-
-[data-testid="column"]:nth-child(2) .stButton > button[kind="primary"] { background: linear-gradient(135deg, #bf5af2, #9945ff) !important; border: none !important; box-shadow: 0 4px 15px rgba(191, 90, 242, 0.35) !important; }
-[data-testid="column"]:nth-child(2) .stButton > button[kind="secondary"] { background: rgba(191, 90, 242, 0.1) !important; border: 1px solid rgba(191, 90, 242, 0.4) !important; color: var(--purple) !important; }
-
-[data-testid="column"]:nth-child(3) .stButton > button[kind="primary"] { background: linear-gradient(135deg, #ff453a, #ff6b6b) !important; border: none !important; box-shadow: 0 4px 15px rgba(255, 69, 58, 0.35) !important; }
-[data-testid="column"]:nth-child(3) .stButton > button[kind="secondary"] { background: rgba(255, 69, 58, 0.1) !important; border: 1px solid rgba(255, 69, 58, 0.4) !important; color: var(--coral) !important; }
-
-/* Progress bar with purple theme */
-.stProgress > div > div { background: linear-gradient(90deg, var(--purple), #d8b4fe) !important; border-radius: 8px; box-shadow: 0 0 10px rgba(191, 90, 242, 0.4); }
-.stProgress > div { background: rgba(191, 90, 242, 0.12) !important; border-radius: 8px; height: 8px !important; }
-
-.msg-ok { background: rgba(48, 209, 88, 0.15); border: 1px solid rgba(48, 209, 88, 0.4); border-left: 4px solid var(--green); border-radius: 0 12px 12px 0; padding: 12px 14px; color: #86efac; margin: 8px 0; font-size: 12px; }
-.msg-err { background: rgba(255, 69, 58, 0.15); border: 1px solid rgba(255, 69, 58, 0.4); border-left: 4px solid var(--coral); border-radius: 0 12px 12px 0; padding: 12px 14px; color: #fca5a5; margin: 8px 0; font-size: 12px; }
-.msg-hint { background: rgba(191, 90, 242, 0.12); border: 1px solid rgba(191, 90, 242, 0.35); border-left: 4px solid var(--purple); border-radius: 0 12px 12px 0; padding: 12px 14px; margin: 8px 0; font-size: 12px; color: #e5e7eb; }
-
-.test-case { background: rgba(191, 90, 242, 0.08); border: 1px solid rgba(191, 90, 242, 0.25); border-radius: 8px; padding: 8px 12px; margin: 4px 0; font-family: 'JetBrains Mono', monospace; font-size: 10px; }
-.test-lbl { color: #d8b4fe; font-weight: 600; }
-
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+/* ========== SLIDER ========== */
+.stSlider > div > div > div {
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple)) !important;
+}
+.stSlider > div > div > div > div {
+    background: var(--neon-cyan) !important;
+    box-shadow: 0 0 15px var(--neon-cyan) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -297,13 +660,14 @@ defaults = {
     "ai_hint": None,
     "app_mode": "Practice",
     "selected_difficulty": "Basic",
-    # Interview engine state
+    "show_chat_modal": False,
+    "reopen_chat": False,
+    "pending_chat_msg": None,
     "interview_active": False,
     "interview_engine": None,
     "interview_code": "",
     "interview_feedback_shown": False,
     "interview_config": {"difficulty": "mid", "type": "technical", "time_limit": 30},
-    # Achievements tracking
     "last_achievements": [],
     "new_achievement": None,
     "used_hint_this_problem": False,
@@ -311,6 +675,18 @@ defaults = {
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+# Interview stage metadata
+STAGE_INFO_LIST = [
+    ("intro", "01", "Introduction", "Read the problem & ask questions", "Clarify requirements, restate the problem, and ask if anything is missing."),
+    ("approach", "02", "Approach Discussion", "Explain your solution strategy", "Describe the algorithm, outline edge cases, and justify data choices."),
+    ("coding", "03", "Coding Time", "Write your solution code", "Translate your plan into readable Python and explain each section as you write."),
+    ("optimization", "04", "Optimization", "Analyze & improve complexity", "Evaluate time/space trade-offs and suggest refinements or alternate algorithms."),
+    ("behavioral", "05", "Behavioral", "Answer situational questions", "Use STAR stories, stay concise, and highlight communication skills."),
+    ("wrapup", "06", "Wrap Up", "Ask your questions", "Summarize your solution, thank the interviewer, and ask about next steps."),
+]
+STAGE_INFO = {key: {"icon": icon, "title": title, "description": desc, "goal": goal} for key, icon, title, desc, goal in STAGE_INFO_LIST}
+STAGE_ORDER = [key for key, _, _, _, _ in STAGE_INFO_LIST]
 
 # Update streak on app load
 if st.session_state.progress:
@@ -373,140 +749,704 @@ def get_chat_context():
     return context
 
 
-# Header
-st.markdown("""
-<div style="text-align:center;padding:6px 0 12px">
-    <div style="display:inline-flex;align-items:center;gap:12px">
-        <div style="font-size:2rem">🤖</div>
-        <div>
-            <div style="font-size:1.6rem;font-weight:800;background:linear-gradient(90deg,#00e5ff,#bf5af2,#ff453a);-webkit-background-clip:text;-webkit-text-fill-color:transparent">PyCode AI</div>
-            <div style="font-size:0.7rem;color:#9ca3af;letter-spacing:1px">SMART PYTHON LEARNING</div>
+# ==================== AI CHAT MODAL ====================
+# Topic-based quick prompts organized by category
+CHAT_PROMPTS = {
+    "Python": [
+        ("What is Python?", "🐍"),
+        ("Explain list comprehension", "📝"),
+        ("How do classes work?", "🏗️"),
+    ],
+    "Selenium": [
+        ("What is Selenium?", "🌐"),
+        ("Explain XPath locators", "🔍"),
+        ("How do waits work?", "⏱️"),
+    ],
+    "Robot": [
+        ("What is Robot Framework?", "🤖"),
+        ("Explain keywords", "🔑"),
+        ("How to use variables?", "📊"),
+    ],
+    "Help": [
+        ("Give me a hint", "💡"),
+        ("Explain this problem", "❓"),
+        ("Debug my code", "🐛"),
+    ]
+}
+
+# Follow-up suggestions based on topic
+FOLLOWUP_SUGGESTIONS = {
+    "python": ["Show me an example", "What are best practices?", "Common mistakes to avoid?"],
+    "selenium": ["Show me code example", "How to handle errors?", "Best practices?"],
+    "robot": ["Show me a test case", "How to organize tests?", "What libraries to use?"],
+    "default": ["Can you give an example?", "Tell me more", "What's the best practice?"]
+}
+
+def get_followups(last_response: str) -> list:
+    """Get contextual follow-up suggestions based on last response."""
+    resp_lower = last_response.lower()
+    if "selenium" in resp_lower or "webdriver" in resp_lower:
+        return FOLLOWUP_SUGGESTIONS["selenium"]
+    elif "robot" in resp_lower or "keyword" in resp_lower:
+        return FOLLOWUP_SUGGESTIONS["robot"]
+    elif "python" in resp_lower or "def " in resp_lower:
+        return FOLLOWUP_SUGGESTIONS["python"]
+    return FOLLOWUP_SUGGESTIONS["default"]
+
+def extract_code_blocks(content: str) -> list:
+    """Extract all Python code blocks from a response."""
+    import re
+    # Find all ```python ... ``` or ``` ... ``` blocks
+    pattern = r'```(?:python)?\n?(.*?)```'
+    matches = re.findall(pattern, content, re.DOTALL)
+    return [m.strip() for m in matches if m.strip()]
+
+def run_python_code_safe(code: str) -> dict:
+    """
+    Safely execute Python code and return the result.
+    Returns dict with 'output', 'error', and 'success' keys.
+    """
+    import sys
+    from io import StringIO
+    import traceback
+    
+    # Restricted globals for safety
+    safe_globals = {
+        '__builtins__': {
+            'print': print, 'len': len, 'range': range, 'str': str, 'int': int,
+            'float': float, 'list': list, 'dict': dict, 'set': set, 'tuple': tuple,
+            'bool': bool, 'sum': sum, 'max': max, 'min': min, 'abs': abs,
+            'sorted': sorted, 'reversed': reversed, 'enumerate': enumerate,
+            'zip': zip, 'map': map, 'filter': filter, 'any': any, 'all': all,
+            'isinstance': isinstance, 'type': type, 'round': round, 'pow': pow,
+            'divmod': divmod, 'chr': chr, 'ord': ord, 'hex': hex, 'bin': bin,
+            'True': True, 'False': False, 'None': None,
+        }
+    }
+    
+    # Capture stdout
+    old_stdout = sys.stdout
+    sys.stdout = captured_output = StringIO()
+    
+    result = {'output': '', 'error': '', 'success': False}
+    
+    try:
+        # Execute with timeout protection (basic)
+        exec(code, safe_globals, {})
+        result['output'] = captured_output.getvalue()
+        result['success'] = True
+    except Exception as e:
+        result['error'] = f"{type(e).__name__}: {str(e)}"
+        result['output'] = captured_output.getvalue()
+    finally:
+        sys.stdout = old_stdout
+    
+    return result
+
+def format_response_html(content: str) -> str:
+    """Format AI response with better styling for code blocks."""
+    import re
+    # Convert markdown code blocks to styled HTML
+    def replace_code_block(match):
+        code = match.group(1)
+        return f'''<div style="position:relative;margin:12px 0">
+            <div style="background:#0d1117;border:1px solid rgba(0,245,255,0.2);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8f4f8;overflow-x:auto;white-space:pre-wrap;line-height:1.5">{code}</div>
+        </div>'''
+    
+    # Replace ```...``` blocks
+    formatted = re.sub(r'```(?:python)?\n?(.*?)```', replace_code_block, content, flags=re.DOTALL)
+    # Convert inline `code` to styled spans
+    formatted = re.sub(r'`([^`]+)`', r'<code style="background:rgba(0,245,255,0.15);color:#00f5ff;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px">\1</code>', formatted)
+    # Convert **bold** to styled spans
+    formatted = re.sub(r'\*\*([^*]+)\*\*', r'<strong style="color:#00ff88;font-weight:600">\1</strong>', formatted)
+    # Convert headers ## to styled divs
+    formatted = re.sub(r'^## (.+)$', r'<div style="color:#00f5ff;font-size:16px;font-weight:700;margin:16px 0 10px;font-family:Orbitron,sans-serif">\1</div>', formatted, flags=re.MULTILINE)
+    formatted = re.sub(r'^### (.+)$', r'<div style="color:#bf00ff;font-size:14px;font-weight:600;margin:12px 0 8px">\1</div>', formatted, flags=re.MULTILINE)
+    # Convert bullet points
+    formatted = re.sub(r'^- (.+)$', r'<div style="padding-left:16px;margin:4px 0;color:#e8f4f8">• \1</div>', formatted, flags=re.MULTILINE)
+    # Convert newlines to breaks
+    formatted = formatted.replace('\n\n', '<div style="height:12px"></div>')
+    formatted = formatted.replace('\n', '<br>')
+    return formatted
+
+@st.dialog("AI Chat Assistant", width="large")
+def show_chat_modal():
+    """Enhanced AI Chat Modal with ChatGPT-like features: Run Code, Copy, Regenerate, Response Modes"""
+    
+    # Initialize chat states
+    if "chat_tab" not in st.session_state:
+        st.session_state.chat_tab = "Python"
+    if "chat_loading" not in st.session_state:
+        st.session_state.chat_loading = False
+    if "response_mode" not in st.session_state:
+        st.session_state.response_mode = "detailed"  # "concise" or "detailed"
+    if "code_output" not in st.session_state:
+        st.session_state.code_output = None
+    if "last_user_msg" not in st.session_state:
+        st.session_state.last_user_msg = None
+    
+    # Enhanced CSS for chat modal
+    st.markdown("""
+    <style>
+    [data-testid="stDialog"] > div { 
+        background: linear-gradient(180deg, #0a1628 0%, #061018 100%) !important; 
+        border: 2px solid rgba(0, 245, 255, 0.3) !important; 
+        border-radius: 20px !important;
+        box-shadow: 0 0 50px rgba(0, 245, 255, 0.2), inset 0 0 30px rgba(0, 245, 255, 0.03) !important;
+    }
+    [data-testid="stDialog"] .stMarkdown p { color: #e8f4f8 !important; }
+    [data-testid="stDialog"] .stMarkdown li { color: #e8f4f8 !important; }
+    [data-testid="stDialog"] .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background: rgba(0,0,0,0.3);
+        padding: 8px;
+        border-radius: 12px;
+    }
+    [data-testid="stDialog"] .stTabs [data-baseweb="tab"] {
+        background: rgba(0,245,255,0.08) !important;
+        border-radius: 8px !important;
+        color: #8fa3b8 !important;
+        padding: 8px 16px !important;
+        font-size: 12px !important;
+    }
+    [data-testid="stDialog"] .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(0,245,255,0.25), rgba(191,0,255,0.15)) !important;
+        color: #00f5ff !important;
+        border: 1px solid rgba(0,245,255,0.4) !important;
+    }
+    @keyframes typing {
+        0%, 80%, 100% { opacity: 0.3; }
+        40% { opacity: 1; }
+    }
+    .typing-dot { 
+        display: inline-block; 
+        width: 8px; 
+        height: 8px; 
+        border-radius: 50%; 
+        background: #00f5ff;
+        margin: 0 3px;
+        animation: typing 1.4s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .code-output {
+        background: #0d1117;
+        border: 1px solid rgba(0,255,136,0.3);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-top: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+    }
+    .code-output-success { border-color: rgba(0,255,136,0.4); }
+    .code-output-error { border-color: rgba(255,100,100,0.4); }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Chat header with Response Mode Toggle
+    hdr_col1, hdr_col2 = st.columns([3, 1])
+    with hdr_col1:
+        st.markdown("""
+        <div style="display:flex;align-items:center;gap:14px">
+            <div style="width:45px;height:45px;border-radius:12px;background:linear-gradient(135deg,rgba(0,245,255,0.15),rgba(191,0,255,0.1));border:2px solid rgba(0,245,255,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#00f5ff;text-shadow:0 0 15px rgba(0,245,255,0.7)">&lt;/&gt;</div>
+            <div>
+                <div style="font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;color:#ffffff;letter-spacing:1px">AI ASSISTANT</div>
+                <div style="font-size:0.7rem;color:#8fa3b8">Python • Selenium • Robot Framework</div>
+            </div>
         </div>
+        """, unsafe_allow_html=True)
+    with hdr_col2:
+        # Response Mode Toggle
+        mode_label = "📝 Detailed" if st.session_state.response_mode == "detailed" else "⚡ Concise"
+        if st.button(mode_label, key="mode_toggle", use_container_width=True, help="Toggle response length"):
+            st.session_state.response_mode = "concise" if st.session_state.response_mode == "detailed" else "detailed"
+            st.session_state.reopen_chat = True
+            st.rerun()
+    
+    st.markdown('<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.3),transparent);margin:12px 0"></div>', unsafe_allow_html=True)
+    
+    # Process pending message if exists
+    if st.session_state.get("pending_chat_msg"):
+        msg = st.session_state.pending_chat_msg
+        st.session_state.pending_chat_msg = None
+        st.session_state.last_user_msg = msg  # Store for regenerate
+        st.session_state.chat_history.append({"role": "user", "content": msg})
+        st.session_state.chat_loading = True
+        try:
+            context = get_chat_context()
+            # Add response mode instruction
+            mode_instruction = "Be concise, use bullet points, keep under 100 words." if st.session_state.response_mode == "concise" else ""
+            enhanced_msg = f"{mode_instruction}\n{context}\nCurrent question: {msg}" if context or mode_instruction else msg
+            if st.session_state.stage:
+                d = QUESTIONS[st.session_state.stage][st.session_state.q_index]
+                cc = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "")
+                resp = builtin_chat(enhanced_msg, d['question'], d['function'], cc, False)
+            else:
+                resp = builtin_chat(enhanced_msg, "", "", "", False)
+            st.session_state.chat_history.append({"role": "assistant", "content": resp})
+        except Exception as e:
+            st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)[:100]}"})
+        st.session_state.chat_loading = False
+        st.session_state.code_output = None  # Clear previous code output
+    
+    # Chat messages container
+    chat_container = st.container(height=220)
+    with chat_container:
+        if not st.session_state.chat_history:
+            st.markdown(f"""
+            <div style="text-align:center;padding:30px 20px">
+                <div style="font-size:42px;margin-bottom:12px;text-shadow:0 0 30px rgba(0,245,255,0.5)">🤖</div>
+                <div style="font-family:'Orbitron',sans-serif;font-size:0.95rem;font-weight:600;color:#ffffff;margin-bottom:6px;letter-spacing:1px">START A CONVERSATION</div>
+                <div style="color:#8fa3b8;font-size:0.8rem;line-height:1.5">
+                    Mode: <span style="color:{'#00ff88' if st.session_state.response_mode == 'concise' else '#00f5ff'}">{'⚡ Concise' if st.session_state.response_mode == 'concise' else '📝 Detailed'}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            for idx, m in enumerate(st.session_state.chat_history[-10:]):
+                if m["role"] == "user":
+                    st.markdown(f'''
+                    <div style="background:linear-gradient(135deg,#00ff88,#00cc6a);color:#030508;padding:10px 14px;border-radius:12px 12px 4px 12px;margin:8px 0 8px 40px;font-size:12px;line-height:1.4;box-shadow:0 0 12px rgba(0,255,136,0.2)">
+                        <div style="font-size:8px;font-weight:600;opacity:0.7;margin-bottom:3px;letter-spacing:1px">YOU</div>
+                        {m["content"][:400]}{"..." if len(m["content"]) > 400 else ""}
+                    </div>
+                    ''', unsafe_allow_html=True)
+                else:
+                    formatted = format_response_html(m["content"])
+                    st.markdown(f'''
+                    <div style="background:linear-gradient(135deg,rgba(0,245,255,0.08),rgba(10,20,40,0.95));border:1px solid rgba(0,245,255,0.2);color:#e8f4f8;padding:12px 16px;border-radius:12px 12px 12px 4px;margin:8px 40px 8px 0;font-size:12px;line-height:1.5;box-shadow:0 0 12px rgba(0,245,255,0.08)">
+                        <div style="font-size:8px;font-weight:600;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
+                        <div style="color:#e8f4f8">{formatted}</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+            
+            # Show typing indicator if loading
+            if st.session_state.get("chat_loading"):
+                st.markdown('''
+                <div style="background:rgba(0,245,255,0.08);border:1px solid rgba(0,245,255,0.2);padding:12px 16px;border-radius:12px;margin:8px 40px 8px 0;display:inline-block">
+                    <div style="font-size:8px;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                </div>
+                ''', unsafe_allow_html=True)
+    
+    # ============ MESSAGE ACTIONS (ChatGPT-like) ============
+    if st.session_state.chat_history and len(st.session_state.chat_history) >= 2:
+        last_ai_msg = None
+        for msg in reversed(st.session_state.chat_history):
+            if msg["role"] == "assistant":
+                last_ai_msg = msg["content"]
+                break
+        
+        if last_ai_msg:
+            st.markdown('<div style="font-size:8px;color:#4a6380;margin:6px 0 4px;letter-spacing:1px">MESSAGE ACTIONS</div>', unsafe_allow_html=True)
+            act_col1, act_col2, act_col3, act_col4 = st.columns(4)
+            
+            # Copy Button
+            with act_col1:
+                if st.button("📋 Copy", key="copy_resp", use_container_width=True, help="Copy response to clipboard"):
+                    st.session_state.copied_text = last_ai_msg
+                    st.toast("✅ Copied to clipboard!")
+            
+            # Run Code Button
+            with act_col2:
+                code_blocks = extract_code_blocks(last_ai_msg)
+                if code_blocks:
+                    if st.button("▶️ Run", key="run_code", use_container_width=True, help="Execute Python code"):
+                        # Run the first code block
+                        result = run_python_code_safe(code_blocks[0])
+                        st.session_state.code_output = result
+                        st.session_state.reopen_chat = True
+                        st.rerun()
+                else:
+                    st.button("▶️ Run", key="run_code_disabled", use_container_width=True, disabled=True, help="No code to run")
+            
+            # Regenerate Button
+            with act_col3:
+                if st.button("🔄 Regen", key="regenerate", use_container_width=True, help="Generate new response"):
+                    if st.session_state.last_user_msg:
+                        # Remove last AI response
+                        if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "assistant":
+                            st.session_state.chat_history.pop()
+                        # Remove last user message too (will be re-added)
+                        if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+                            st.session_state.chat_history.pop()
+                        st.session_state.pending_chat_msg = st.session_state.last_user_msg
+                        st.session_state.reopen_chat = True
+                        st.rerun()
+            
+            # Thumbs feedback
+            with act_col4:
+                fb_c1, fb_c2 = st.columns(2)
+                with fb_c1:
+                    if st.button("👍", key="thumbs_up", use_container_width=True):
+                        st.toast("Thanks for the feedback! 🎉")
+                with fb_c2:
+                    if st.button("👎", key="thumbs_down", use_container_width=True):
+                        st.toast("Got it, I'll try to improve! 🔧")
+            
+            # Show code output if exists
+            if st.session_state.code_output:
+                result = st.session_state.code_output
+                if result['success']:
+                    output_text = result['output'] if result['output'] else "(No output)"
+                    st.markdown(f'''
+                    <div style="background:#0a1a0f;border:1px solid rgba(0,255,136,0.3);border-radius:8px;padding:10px 12px;margin:8px 0">
+                        <div style="font-size:9px;color:#00ff88;margin-bottom:4px;letter-spacing:1px">✓ OUTPUT</div>
+                        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e8f4f8;white-space:pre-wrap">{output_text}</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'''
+                    <div style="background:#1a0a0a;border:1px solid rgba(255,100,100,0.3);border-radius:8px;padding:10px 12px;margin:8px 0">
+                        <div style="font-size:9px;color:#ff6b6b;margin-bottom:4px;letter-spacing:1px">✗ ERROR</div>
+                        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff9999;white-space:pre-wrap">{result['error']}</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+    
+    # Follow-up suggestions
+    if st.session_state.chat_history:
+        last_resp = ""
+        for msg in reversed(st.session_state.chat_history):
+            if msg["role"] == "assistant":
+                last_resp = msg["content"]
+                break
+        if last_resp:
+            followups = get_followups(last_resp)
+            st.markdown('<div style="font-size:8px;color:#4a6380;margin:8px 0 4px;letter-spacing:1px">FOLLOW-UP</div>', unsafe_allow_html=True)
+            fu_cols = st.columns(3)
+            for i, fu in enumerate(followups):
+                with fu_cols[i]:
+                    if st.button(fu, key=f"fu_{i}", use_container_width=True):
+                        st.session_state.pending_chat_msg = fu
+                        st.session_state.reopen_chat = True
+                        st.rerun()
+    
+    # Topic category tabs with prompts
+    st.markdown('<div style="font-size:8px;color:#4a6380;margin:8px 0 4px;letter-spacing:1px">QUICK PROMPTS</div>', unsafe_allow_html=True)
+    
+    tab_python, tab_selenium, tab_robot, tab_help = st.tabs(["🐍 Python", "🌐 Selenium", "🤖 Robot", "💡 Help"])
+    
+    with tab_python:
+        cols = st.columns(3)
+        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Python"]):
+            with cols[i]:
+                if st.button(f"{icon} {prompt}", key=f"py_{i}", use_container_width=True):
+                    st.session_state.pending_chat_msg = prompt
+                    st.session_state.reopen_chat = True
+                    st.rerun()
+    
+    with tab_selenium:
+        cols = st.columns(3)
+        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Selenium"]):
+            with cols[i]:
+                if st.button(f"{icon} {prompt}", key=f"sel_{i}", use_container_width=True):
+                    st.session_state.pending_chat_msg = prompt
+                    st.session_state.reopen_chat = True
+                    st.rerun()
+    
+    with tab_robot:
+        cols = st.columns(3)
+        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Robot"]):
+            with cols[i]:
+                if st.button(f"{icon} {prompt}", key=f"rob_{i}", use_container_width=True):
+                    st.session_state.pending_chat_msg = prompt
+                    st.session_state.reopen_chat = True
+                    st.rerun()
+    
+    with tab_help:
+        cols = st.columns(3)
+        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Help"]):
+            with cols[i]:
+                if st.button(f"{icon} {prompt}", key=f"help_{i}", use_container_width=True):
+                    st.session_state.pending_chat_msg = prompt
+                    st.session_state.reopen_chat = True
+                    st.rerun()
+    
+    # Input form
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    with st.form(key="chat_form", clear_on_submit=True):
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            user_msg = st.text_input("Ask a question", placeholder="Ask anything or paste code to run...", key="modal_chat_input", label_visibility="collapsed")
+        with col2:
+            send_btn = st.form_submit_button("Send", type="primary", use_container_width=True)
+        
+        if send_btn and user_msg:
+            st.session_state.pending_chat_msg = user_msg
+            st.session_state.reopen_chat = True
+            st.rerun()
+    
+    # Bottom actions
+    bottom_cols = st.columns([1, 1, 1])
+    with bottom_cols[0]:
+        if st.button("🗑️ Clear", use_container_width=True):
+            st.session_state.chat_history = []
+            st.session_state.code_output = None
+            st.session_state.reopen_chat = True
+            st.rerun()
+    with bottom_cols[1]:
+        if st.button("📄 Explain Code", use_container_width=True):
+            code = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "# No code yet")
+            st.session_state.pending_chat_msg = f"Explain this code:\n```python\n{code[:300]}\n```"
+            st.session_state.reopen_chat = True
+            st.rerun()
+    with bottom_cols[2]:
+        mode_icon = "⚡" if st.session_state.response_mode == "concise" else "📝"
+        mode_text = "Concise" if st.session_state.response_mode == "concise" else "Detailed"
+        st.markdown(f'<div style="text-align:center;padding:8px;font-size:10px;color:#6b8068">{mode_icon} {mode_text} Mode</div>', unsafe_allow_html=True)
+
+
+# ==================== HEADER ====================
+header_cols = st.columns([1, 4, 1])
+
+with header_cols[0]:
+    st.markdown('''
+    <div style="padding:8px 0">
+        <div style="
+            width:40px;height:40px;
+            background:linear-gradient(135deg,rgba(0,245,255,0.2),rgba(191,0,255,0.1));
+            border:1px solid rgba(0,245,255,0.4);
+            border-radius:10px;
+            display:flex;align-items:center;justify-content:center;
+            font-family:'Orbitron',sans-serif;font-size:14px;font-weight:800;
+            color:#00f5ff;text-shadow:0 0 20px #00f5ff;
+            box-shadow:0 0 25px rgba(0,245,255,0.3);
+        ">&lt;/&gt;</div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
+
+with header_cols[1]:
+    st.markdown("""
+    <div style="text-align:center;padding:6px 0">
+        <div style="
+            font-family:'Orbitron',sans-serif;
+            font-size:2rem;font-weight:900;letter-spacing:6px;
+            background:linear-gradient(90deg,#00f5ff,#bf00ff,#00f5ff);
+            background-size:200% auto;
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+            animation:shine 3s linear infinite;
+            text-shadow:0 0 40px rgba(0,245,255,0.5);
+        ">PYCODE</div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:0.6rem;color:#4a6380;letter-spacing:4px;margin-top:4px">CYBER · CODING · PLATFORM</div>
+    </div>
+    <style>@keyframes shine{0%{background-position:0% center}100%{background-position:200% center}}</style>
+    """, unsafe_allow_html=True)
+    
+with header_cols[2]:
+    if st.button("AI Chat", type="primary", use_container_width=True, key="open_chat"):
+        st.session_state.reopen_chat = False
+        show_chat_modal()
+
+# Auto-reopen chat modal if flag is set
+if st.session_state.get("reopen_chat", False):
+    st.session_state.reopen_chat = False
+    show_chat_modal()
 
 # Mode Selector
-mode_cols = st.columns([1, 3, 1])
+mode_cols = st.columns([1, 2, 1])
 with mode_cols[1]:
-    modes = ["💻 Practice", "🎯 Interview", "🤖 AI Chat"]
-    current_idx = 0
-    if st.session_state.app_mode == "Interview":
-        current_idx = 1
-    elif st.session_state.app_mode == "Chat":
-        current_idx = 2
-    
-    mode = st.radio("", modes, index=current_idx, horizontal=True, label_visibility="collapsed")
-    new_mode = mode.split(" ")[-1]
-    if new_mode != st.session_state.app_mode:
-        st.session_state.app_mode = new_mode
+    modes = ["Practice", "Interview"]
+    current_idx = 0 if st.session_state.app_mode == "Practice" else 1
+    mode = st.radio("Mode", modes, index=current_idx, horizontal=True, label_visibility="collapsed")
+    if mode != st.session_state.app_mode:
+        st.session_state.app_mode = mode
         st.rerun()
 
-# Layout - three distinct phone interfaces
-c1, c2, c3 = st.columns([1, 1.25, 1], gap="large")
+# ==================== MAIN LAYOUT - 2 CARDS ====================
+c1, c2 = st.columns([1, 1.3], gap="large")
 
-# LEFT PHONE - PROBLEMS
+# ==================== LEFT CARD - PROBLEMS ====================
 with c1:
-    st.markdown('<div class="notch"><div class="notch-cam"></div><div class="notch-led"></div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="status-bar status-bar-cyan"><span>9:41</span><span>📶 🔋 100%</span></div>', unsafe_allow_html=True)
-    
     if st.session_state.app_mode == "Interview":
-        st.markdown('<div class="phone-header phone-header-cyan"><span class="phone-title title-cyan">Interview</span><div class="avatar av-cyan">🎯</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-header"><span class="card-title">Interview</span><span class="card-badge">MOCK</span></div>', unsafe_allow_html=True)
         
         if not st.session_state.interview_active:
-            # Interview Setup Panel
+            # Interview Setup with Clear Instructions
+            st.markdown("""
+            <div style="background:linear-gradient(135deg,rgba(0,245,255,0.06),rgba(10,20,40,0.9));border:1px solid rgba(0,245,255,0.2);border-radius:12px;padding:16px;margin-bottom:18px;position:relative;overflow:hidden">
+                <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#00f5ff,transparent)"></div>
+                <div style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:600;color:#00f5ff;margin-bottom:8px;letter-spacing:2px;text-shadow:0 0 10px rgba(0,245,255,0.5)">MOCK INTERVIEW MODE</div>
+                <div style="font-size:12px;color:#8fa3b8;line-height:1.6">Practice technical interviews with AI. Stages: <span style="color:#00f5ff">INTRO</span> → <span style="color:#bf00ff">APPROACH</span> → <span style="color:#00ff88">CODING</span> → <span style="color:#ff6b00">OPTIMIZE</span> → <span style="color:#ff00aa">WRAP-UP</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("""
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(0,245,255,0.12);border-radius:14px;padding:14px;margin-bottom:16px;">
+                <div style="font-size:0.7rem;font-weight:700;color:#00f5ff;letter-spacing:2px;margin-bottom:6px">HOW IT WORKS</div>
+                <div style="font-size:12px;color:#a3b8a0;line-height:1.6">
+                    • <strong>Intro:</strong> Rephrase the prompt, ask any clarifications, and confirm constraints.<br/>
+                    • <strong>Approach:</strong> Describe your algorithm, mention space/time trade-offs, then plan.<br/>
+                    • <strong>Coding:</strong> Translate your approach into working code while narrating key decisions.<br/>
+                    • <strong>Optimization:</strong> Analyze complexity and suggest refinements.<br/>
+                    • <strong>Wrap-up:</strong> Ask for feedback, highlight what you learned, thank the interviewer.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+            st.markdown("""
+            <div style="display:flex;gap:10px;margin-bottom:14px;">
+                <div style="flex:1;background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:11px;color:#00ff88;font-weight:600">AI Coach</div>
+                    <div style="font-size:14px;color:#ffffff;margin-top:6px;">Guides the flow</div>
+                    <div style="font-size:10px;color:#6b8068;margin-top:4px;">Hints, nudges, reminders</div>
+                </div>
+                <div style="flex:1;background:rgba(191,0,255,0.08);border:1px solid rgba(191,0,255,0.3);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:11px;color:#bf00ff;font-weight:600">Live Feedback</div>
+                    <div style="font-size:14px;color:#ffffff;margin-top:6px;">Metrics + tips</div>
+                    <div style="font-size:10px;color:#6b8068;margin-top:4px;">Scores, strengths, gaps</div>
+                </div>
+                <div style="flex:1;background:rgba(245,107,0,0.08);border:1px solid rgba(245,107,0,0.3);border-radius:10px;padding:10px;text-align:center;">
+                    <div style="font-size:11px;color:#ff6b00;font-weight:600">Wrap-Up</div>
+                    <div style="font-size:14px;color:#ffffff;margin-top:6px;">Reflect</div>
+                    <div style="font-size:10px;color:#6b8068;margin-top:4px;">Ask questions, note improvements</div>
+                </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
             st.markdown('<div class="section-title sec-cyan">DIFFICULTY</div>', unsafe_allow_html=True)
-            diff_map = {"Junior": "junior", "Mid-Level": "mid", "Senior": "senior"}
-            diff = st.selectbox("", list(diff_map.keys()), index=1, key="iv_diff", label_visibility="collapsed")
+            diff_map = {"Junior (Entry Level)": "junior", "Mid-Level (2-4 years)": "mid", "Senior (5+ years)": "senior"}
+            diff = st.selectbox("Difficulty level", list(diff_map.keys()), index=1, key="iv_diff", label_visibility="collapsed")
             
-            st.markdown('<div class="section-title sec-cyan">TYPE</div>', unsafe_allow_html=True)
-            type_map = {"Technical": "technical", "Behavioral": "behavioral", "Mixed": "mixed"}
-            iv_type = st.selectbox("", list(type_map.keys()), index=0, key="iv_type", label_visibility="collapsed")
+            st.markdown('<div class="section-title sec-cyan">INTERVIEW TYPE</div>', unsafe_allow_html=True)
+            type_map = {"Technical (Coding Focus)": "technical", "Behavioral (Soft Skills)": "behavioral", "Mixed (Both)": "mixed"}
+            iv_type = st.selectbox("Interview type", list(type_map.keys()), index=0, key="iv_type", label_visibility="collapsed")
             
-            st.markdown('<div class="section-title sec-cyan">TIME (minutes)</div>', unsafe_allow_html=True)
-            time_limit = st.slider("", 15, 60, 30, 5, key="iv_time", label_visibility="collapsed")
+            st.markdown('<div class="section-title sec-cyan">TIME LIMIT</div>', unsafe_allow_html=True)
+            time_limit = st.slider("Time limit (min)", 15, 60, 30, 5, key="iv_time", label_visibility="collapsed")
+            st.markdown(f'<div style="text-align:center;font-size:11px;color:#6b8068">{time_limit} minutes</div>', unsafe_allow_html=True)
             
-            st.markdown('<div class="section-title sec-cyan">PROBLEM</div>', unsafe_allow_html=True)
-            # Select a random problem for the interview
-            problem_stage = "Intermediate" if diff == "Mid-Level" else ("Advanced" if diff == "Senior" else "Basic")
+            st.markdown('<div class="section-title sec-cyan">SELECT PROBLEM</div>', unsafe_allow_html=True)
+            diff_key = diff.split(" ")[0]
+            problem_stage = "Intermediate" if "Mid" in diff else ("Advanced" if "Senior" in diff else "Basic")
             available_problems = [(i, q) for i, q in enumerate(QUESTIONS[problem_stage])]
-            problem_names = [f"{q['question'][:30]}..." for _, q in available_problems]
-            selected_problem = st.selectbox("", problem_names, key="iv_problem", label_visibility="collapsed")
+            problem_names = [f"{q['question'][:40]}..." for _, q in available_problems]
+            selected_problem = st.selectbox("Problem", problem_names, key="iv_problem", label_visibility="collapsed")
             
-            if st.button("🚀 Start Interview", type="primary", use_container_width=True):
-                # Create interview engine with selected config
+            st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+            
+            if st.button("Start Interview", type="primary", use_container_width=True):
                 engine = create_interview_engine(
                     difficulty=diff_map[diff],
                     interview_type=type_map[iv_type],
                     time_limit=time_limit
                 )
-                
-                # Get selected problem
                 prob_idx = problem_names.index(selected_problem)
                 problem_data = available_problems[prob_idx][1]
-                
-                # Start the interview
                 intro_msg = engine.start_new_interview(
                     problem=problem_data["question"],
                     function_name=problem_data["function"]
                 )
-                
+                # Add the intro message to conversation history
+                engine.state.add_message("assistant", intro_msg)
                 st.session_state.interview_engine = engine
                 st.session_state.interview_active = True
-                st.session_state.interview_code = f"def {problem_data['function']}():\n    # Your code here\n    pass"
+                st.session_state.interview_code = f"def {problem_data['function']}():\n    # Write your solution here\n    pass"
                 st.session_state.interview_feedback_shown = False
                 st.session_state.interview_problem = problem_data
                 st.rerun()
+        
+            # Interview History
+            history = load_interview_history()
+            if history:
+                st.markdown('<div class="section-title sec-cyan">YOUR HISTORY</div>', unsafe_allow_html=True)
+                for h in history[-3:][::-1]:
+                    grade = h.get("grade", "?")
+                    topic = h.get("topic", "Interview")[:20]
+                    rec = h.get("recommendation", "")[:15]
+                    st.markdown(f'<div class="q-card"><div class="q-header"><span class="q-icon">#</span><span class="q-title">{topic}</span><span style="color:#4ade80;font-weight:700">{grade}</span></div><div style="font-size:10px;color:#6b8068;margin-top:4px">{rec}</div></div>', unsafe_allow_html=True)
         else:
-            # Show Interview Progress
+            # Active Interview - Left Panel (Status & Tips)
             engine = st.session_state.interview_engine
             if engine:
                 progress = engine.get_stage_progress()
-                
-                # Stage indicator
-                stage_icons = {
-                    "intro": "👋", "approach": "🧠", "coding": "💻",
-                    "optimization": "⚡", "behavioral": "💬", "wrapup": "🎁", "completed": "✅"
-                }
                 current_stage = progress["current_stage"]
-                st.markdown(f'<div class="stat-card"><div class="stat-num">{stage_icons.get(current_stage, "🎯")}</div><div class="stat-label">{current_stage.upper()}</div></div>', unsafe_allow_html=True)
+                stage_info = STAGE_INFO.get(current_stage, {})
+                icon = stage_info.get("icon", "00")
+                title = stage_info.get("title", current_stage.title())
+                desc = stage_info.get("description", "")
+                st.markdown(f'''
+                <div style="background:linear-gradient(135deg,rgba(0,245,255,0.08),rgba(10,20,40,0.95));border:1px solid rgba(0,245,255,0.3);border-radius:14px;padding:18px;text-align:center;margin-bottom:14px;position:relative;box-shadow:0 0 30px rgba(0,245,255,0.15)">
+                    <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:2px;background:linear-gradient(90deg,transparent,#00f5ff,transparent)"></div>
+                    <div style="font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:900;background:linear-gradient(180deg,#fff,#00f5ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 0 30px rgba(0,245,255,0.8);margin-bottom:8px">{icon}</div>
+                    <div style="font-family:'Orbitron',sans-serif;font-size:0.85rem;font-weight:700;color:#00f5ff;text-transform:uppercase;letter-spacing:3px;text-shadow:0 0 15px rgba(0,245,255,0.5)">{title}</div>
+                    <div style="font-size:10px;color:#8fa3b8;margin-top:8px">{desc}</div>
+                </div>
+                ''', unsafe_allow_html=True)
+                stage_sequence = [
+                    ("intro", "Intro"),
+                    ("approach", "Approach"),
+                    ("coding", "Coding"),
+                    ("optimization", "Optimize"),
+                    ("behavioral", "Behavioral"),
+                    ("wrapup", "Wrap-up")
+                ]
+                stage_markers = []
+                for key, label in stage_sequence:
+                    active = key == current_stage
+                    color = "#00f5ff" if active else "rgba(255,255,255,0.15)"
+                    stage_markers.append(f'<div style="flex:1;border-radius:8px;border:1px solid {color};background:{color};padding:6px 4px;font-size:10px;font-weight:600;color:#030508;text-align:center;letter-spacing:1px;margin:0 4px">{label}</div>')
+                st.markdown(f'<div style="display:flex;margin-bottom:12px;">{"".join(stage_markers)}</div>', unsafe_allow_html=True)
                 
-                # Time remaining
+                # Timer
                 remaining = progress["remaining_time"]
                 mins, secs = divmod(remaining, 60)
-                time_color = "var(--coral)" if remaining < 120 else "var(--cyan)"
-                st.markdown(f'<div style="text-align:center;font-size:1.5rem;font-weight:700;color:{time_color};font-family:JetBrains Mono">{mins:02d}:{secs:02d}</div>', unsafe_allow_html=True)
+                time_color = "#ff00aa" if remaining < 120 else "#00f5ff"
+                time_glow = "rgba(255,0,170,0.4)" if remaining < 120 else "rgba(0,245,255,0.4)"
+                st.markdown(f'''
+                <div style="text-align:center;font-family:'Orbitron',sans-serif;font-size:2rem;font-weight:700;color:{time_color};padding:14px;background:rgba(10,15,30,0.8);border:1px solid {time_color};border-radius:12px;margin-bottom:14px;letter-spacing:4px;text-shadow:0 0 20px {time_glow};box-shadow:0 0 25px {time_glow}">
+                    {mins:02d}:{secs:02d}
+            </div>
+                ''', unsafe_allow_html=True)
                 
-                # Progress bar
+                # Progress Bar
                 st.progress(progress["progress_percent"] / 100)
+                st.markdown(f'<div style="text-align:center;font-size:10px;color:#6b8068;margin-top:4px">Stage {progress["stage_index"] + 1} of {progress["total_stages"]}</div>', unsafe_allow_html=True)
                 
-                # Live scores (if enabled)
+                # Live Scores with Progress Bars
                 scores = engine.state.scores
-                st.markdown('<div class="section-title sec-cyan">LIVE SCORES</div>', unsafe_allow_html=True)
+                st.markdown('<div class="section-title sec-cyan">LIVE METRICS</div>', unsafe_allow_html=True)
                 score_items = [
-                    ("🧩 Problem", scores.problem_solving),
-                    ("💬 Comms", scores.communication),
-                    ("📝 Code", scores.code_quality),
-                    ("📊 Analysis", scores.complexity_analysis)
+                    ("Problem Solving", scores.problem_solving, "#00ff88"),
+                    ("Communication", scores.communication, "#00f5ff"),
+                    ("Code Quality", scores.code_quality, "#f59e0b"),
+                    ("Complexity", scores.complexity_analysis, "#fbbf24")
                 ]
-                for label, score in score_items:
-                    st.markdown(f'<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:11px"><span>{label}</span><span style="color:var(--cyan)">{score:.0f}</span></div>', unsafe_allow_html=True)
+                for label, score, color in score_items:
+                    st.markdown(f'''
+                    <div style="margin-bottom:10px">
+                        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+                            <span style="color:#a3b8a0">{label}</span>
+                            <span style="color:{color};font-weight:600">{score:.0f}</span>
+            </div>
+                        <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:5px;overflow:hidden">
+                            <div style="width:{score}%;height:100%;background:{color};border-radius:4px"></div>
+            </div>
+        </div>
+                    ''', unsafe_allow_html=True)
                 
-                if st.button("🛑 End Interview", use_container_width=True, type="secondary"):
-                    feedback = engine.force_end_interview()
+                # Stage-Specific Tips
+                stage_tips = {
+                    "intro": ["• Ask clarifying questions", "• Confirm input/output format", "• Say 'I'm ready' to proceed"],
+                    "approach": ["• Explain your algorithm", "• Mention edge cases", "• Discuss data structures"],
+                    "coding": ["• Write clean code", "• Add comments", "• Talk through your logic"],
+                    "optimization": ["• Analyze time complexity", "• Discuss space usage", "• Suggest improvements"],
+                    "behavioral": ["• Use STAR method", "• Give specific examples", "• Be concise"],
+                    "wrapup": ["• Ask about the team", "• Show genuine interest", "• Thank the interviewer"]
+                }
+                tips = stage_tips.get(current_stage, [])
+                if tips:
+                    st.markdown('<div class="section-title sec-cyan">TIPS FOR THIS STAGE</div>', unsafe_allow_html=True)
+                    for tip in tips:
+                        st.markdown(f'<div style="font-size:11px;color:#6b8068;padding:4px 0">{tip}</div>', unsafe_allow_html=True)
+                
+                st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+                
+                if st.button("End Interview Early", use_container_width=True, type="secondary"):
+                    engine.force_end_interview()
                     st.session_state.interview_feedback_shown = True
                     st.rerun()
-        
-        # Recent interviews
-        history = load_interview_history()
-        if history and not st.session_state.interview_active:
-            st.markdown('<div class="section-title sec-cyan">RECENT</div>', unsafe_allow_html=True)
-            for h in history[-3:]:
-                grade = h.get("grade", "?")
-                topic = h.get("topic", "Interview")[:20]
-                st.markdown(f'<div class="q-card"><div class="q-header"><span class="q-icon">📊</span><span class="q-title">{topic}</span><span style="color:var(--green)">{grade}</span></div></div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="phone-header phone-header-cyan"><span class="phone-title title-cyan">Problems</span><div class="avatar av-cyan">📋</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card-header"><span class="card-title">Problems</span></div>', unsafe_allow_html=True)
         
         stats = get_stats(st.session_state.progress)
         st.markdown(f'<div class="stats-row"><div class="stat-card"><div class="stat-num">{stats["total_completed"]}</div><div class="stat-label">Solved</div></div><div class="stat-card"><div class="stat-num">{stats["completion_rate"]:.0f}%</div><div class="stat-label">Progress</div></div></div>', unsafe_allow_html=True)
@@ -519,137 +1459,260 @@ with c1:
                 if st.button(d[:3].upper(), key=f"diff_{d}", use_container_width=True, type=btn_type):
                     st.session_state.selected_difficulty = d
                     st.rerun()
-        
+    
         selected_d = st.session_state.selected_difficulty
         t, c, s = get_stats_d(selected_d)
         st.markdown(f'<div class="section-title sec-cyan">{selected_d.upper()} ({c}/{t})</div>', unsafe_allow_html=True)
         
-        with st.container(height=320):
+        with st.container(height=380):
             for i, q in enumerate(QUESTIONS[selected_d]):
-                icon = get_status(selected_d, i)
+                status = get_status(selected_d, i)
+                # Replace emoji status icons with text indicators
+                status_text = "✓" if status == "✅" else ("→" if status == "🔄" else str(i+1).zfill(2))
                 is_active = st.session_state.stage == selected_d and st.session_state.q_index == i
                 active_cls = "q-card-active" if is_active else ""
-                
-                st.markdown(f'<div class="q-card {active_cls}"><div class="q-header"><span class="q-icon">{icon}</span><span class="q-title">{q["question"][:26]}...</span></div><div class="q-tags">{", ".join(q.get("tags", [])[:2])}</div></div>', unsafe_allow_html=True)
-                
-                if st.button("Select →", key=f"sel_{selected_d}_{i}", use_container_width=True):
+                st.markdown(f'<div class="q-card {active_cls}"><div class="q-header"><span class="q-icon">{status_text}</span><span class="q-title">{q["question"][:30]}...</span></div><div class="q-tags">{", ".join(q.get("tags", [])[:2])}</div></div>', unsafe_allow_html=True)
+                if st.button("Select", key=f"sel_{selected_d}_{i}", use_container_width=True):
                     go_to(selected_d, i)
                     st.rerun()
-
-# CENTER PHONE - CODE EDITOR
+        
+# ==================== RIGHT CARD - CODE EDITOR ====================
 with c2:
-    st.markdown('<div class="notch"><div class="notch-cam"></div><div class="notch-led"></div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="status-bar status-bar-purple"><span>9:41</span><span>📶 🔋 100%</span></div>', unsafe_allow_html=True)
-    
     if st.session_state.app_mode == "Interview" and st.session_state.interview_active:
         engine = st.session_state.interview_engine
         
         if engine and st.session_state.interview_feedback_shown:
-            # Show final feedback
-            st.markdown('<div style="text-align:center;font-weight:700;color:#30d158;padding:8px;margin-bottom:10px;background:rgba(48,209,88,0.1);border-radius:10px">✅ Interview Complete</div>', unsafe_allow_html=True)
+            # Interview Complete - Show Detailed Feedback
+            scores = engine.state.scores
+            total = scores.get_total()
+            grade = scores.get_grade()
+            rec = scores.get_hiring_recommendation()
             
-            feedback = engine._generate_final_feedback()
-            st.markdown(f'<div class="msg-hint" style="max-height:500px;overflow-y:auto">{feedback}</div>', unsafe_allow_html=True)
+            # Grade Display with Color
+            grade_colors = {"A": "#4ade80", "B": "#22c55e", "C": "#fbbf24", "D": "#f59e0b", "F": "#f87171"}
+            grade_color = grade_colors.get(grade, "#6b8068")
             
-            # Save interview result
+            st.markdown(f'''
+            <div style="text-align:center;padding:24px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);border-radius:20px;margin-bottom:18px">
+                <div style="font-size:3rem;font-weight:800;color:{grade_color};letter-spacing:-2px">{grade}</div>
+                <div style="font-size:1.4rem;font-weight:700;color:#f5f5f0">{total:.0f}/100</div>
+                <div style="font-size:0.85rem;color:#4ade80;font-weight:600;margin-top:8px">{rec}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            # Score Breakdown
+            st.markdown('<div class="section-title sec-purple">SCORE BREAKDOWN</div>', unsafe_allow_html=True)
+            score_data = [
+                ("Problem Solving", scores.problem_solving, "#4ade80", "35%"),
+                ("Communication", scores.communication, "#22c55e", "25%"),
+                ("Code Quality", scores.code_quality, "#f59e0b", "25%"),
+                ("Complexity Analysis", scores.complexity_analysis, "#fbbf24", "15%")
+            ]
+            for name, score, color, weight in score_data:
+                st.markdown(f'''
+                <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px 14px;margin-bottom:10px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <span style="font-size:12px;font-weight:600;color:#f5f5f0">{name}</span>
+                        <span style="font-size:14px;font-weight:700;color:{color}">{score:.0f}</span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06);border-radius:4px;height:6px;overflow:hidden">
+                        <div style="width:{score}%;height:100%;background:{color};border-radius:4px"></div>
+                    </div>
+                    <div style="font-size:9px;color:#6b8068;margin-top:4px">Weight: {weight}</div>
+                </div>
+                ''', unsafe_allow_html=True)
+            
+            # Strengths & Improvements
+            strengths = []
+            improvements = []
+            aspects = scores.evaluated_aspects
+            
+            if aspects.get("explained_approach"): strengths.append("Clear problem-solving approach")
+            else: improvements.append("Explain your approach before coding")
+            if aspects.get("mentioned_edge_cases"): strengths.append("Good edge case awareness")
+            else: improvements.append("Consider edge cases more thoroughly")
+            if aspects.get("discussed_complexity"): strengths.append("Strong complexity analysis")
+            else: improvements.append("Practice analyzing time/space complexity")
+            if aspects.get("asked_clarifying_questions"): strengths.append("Asked clarifying questions")
+            else: improvements.append("Ask more clarifying questions upfront")
+            if aspects.get("wrote_working_code"): strengths.append("Produced working code")
+            else: improvements.append("Focus on getting to working code faster")
+            
+            if strengths:
+                st.markdown('<div class="section-title sec-purple">STRENGTHS</div>', unsafe_allow_html=True)
+                for s in strengths:
+                    st.markdown(f'<div style="font-size:12px;color:#4ade80;padding:5px 0">+ {s}</div>', unsafe_allow_html=True)
+            
+            if improvements:
+                st.markdown('<div class="section-title sec-purple">AREAS TO IMPROVE</div>', unsafe_allow_html=True)
+                for i in improvements:
+                    st.markdown(f'<div style="font-size:12px;color:#f59e0b;padding:5px 0">• {i}</div>', unsafe_allow_html=True)
+            
+            # Save Result
             result = {
                 "topic": engine.state.problem_name,
-                "scores": {
-                    "problem_solving": engine.state.scores.problem_solving,
-                    "communication": engine.state.scores.communication,
-                    "code_quality": engine.state.scores.code_quality,
-                    "complexity_analysis": engine.state.scores.complexity_analysis,
-                    "total": engine.state.scores.get_total()
-                },
-                "grade": engine.state.scores.get_grade(),
-                "recommendation": engine.state.scores.get_hiring_recommendation(),
+                "scores": {"problem_solving": scores.problem_solving, "communication": scores.communication, "code_quality": scores.code_quality, "complexity_analysis": scores.complexity_analysis, "total": total},
+                "grade": grade,
+                "recommendation": rec,
                 "difficulty": engine.state.config.difficulty.value,
                 "interview_type": engine.state.config.interview_type.value,
                 "duration_seconds": engine.state.get_elapsed_time()
             }
             save_interview_history(result)
             
-            if st.button("🔄 Start New Interview", type="primary", use_container_width=True):
+            st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
+            if st.button("Start New Interview", type="primary", use_container_width=True):
                 st.session_state.interview_active = False
                 st.session_state.interview_engine = None
                 st.session_state.interview_feedback_shown = False
                 st.rerun()
         
         elif engine:
-            # Active interview
+            # Active Interview - Right Panel (Conversation & Code)
             problem = st.session_state.get("interview_problem", {})
             progress = engine.get_stage_progress()
             current_stage = progress["current_stage"]
+            stage_info = STAGE_INFO.get(current_stage, {"title": current_stage.title(), "goal": ""})
             
-            # Header with problem and stage
-            stage_names = {"intro": "Introduction", "approach": "Approach", "coding": "Coding", "optimization": "Optimization", "behavioral": "Behavioral", "wrapup": "Wrap Up"}
-            st.markdown(f'<div style="text-align:center;font-weight:700;color:#d8b4fe;padding:8px;margin-bottom:10px;background:rgba(191,90,242,0.1);border-radius:10px">🎯 {stage_names.get(current_stage, "Interview")}</div>', unsafe_allow_html=True)
+            # Stage Header
+            st.markdown(f'''
+            <div style="text-align:center;font-weight:600;color:#f59e0b;padding:14px;margin-bottom:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);border-radius:14px;font-size:1rem;letter-spacing:0.5px">
+                {stage_info.get("title", current_stage.title())}
+            </div>
+            ''', unsafe_allow_html=True)
+            # Stage timeline
+            markers = []
+            for key in STAGE_ORDER:
+                info = STAGE_INFO[key]
+                active = key == current_stage
+                color = "#00f5ff" if active else "rgba(255,255,255,0.15)"
+                text_color = "#030508" if active else "#a3b8a0"
+                markers.append(f'<div style="flex:1;padding:6px 4px;margin:0 4px;border-radius:8px;border:1px solid {color};background:{color};font-size:11px;font-weight:600;color:{text_color};text-align:center;letter-spacing:1px">{info["title"]}</div>')
+            st.markdown(f'<div style="display:flex;margin-bottom:12px;">{"".join(markers)}</div>', unsafe_allow_html=True)
+            goal = stage_info.get("goal", "")
+            if goal:
+                st.markdown(f'<div style="font-size:12px;color:#6b8068;margin-bottom:10px;line-height:1.6">{goal}</div>', unsafe_allow_html=True)
             
-            # Problem display
+            # Problem Statement (Always Visible)
             if problem:
-                st.markdown(f'<div class="problem-box"><div class="problem-title">{problem.get("question", "Coding Problem")}</div></div>', unsafe_allow_html=True)
+                st.markdown(f'''
+                <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:12px;padding:14px;margin-bottom:12px">
+                    <div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Problem</div>
+                    <div style="font-size:13px;font-weight:500;color:#f5f5f0;line-height:1.5">{problem.get("question", "")}</div>
+        </div>
+                ''', unsafe_allow_html=True)
             
-            # Conversation history
+            # Conversation Area (Larger)
+            st.markdown('<div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin:10px 0 6px">Conversation</div>', unsafe_allow_html=True)
             with st.container(height=180):
-                for msg in engine.state.conversation_history[-6:]:
-                    if msg["role"] == "user":
-                        st.markdown(f'<div class="msg msg-user">{msg["content"]}</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown(f'<div class="msg msg-ai">{msg["content"]}</div>', unsafe_allow_html=True)
+                if engine.state.conversation_history:
+                    for msg in engine.state.conversation_history:
+                        if msg["role"] == "user":
+                            st.markdown(f'''
+                            <div style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#0f1a14;padding:10px 14px;border-radius:16px 16px 4px 16px;margin:8px 0 8px 40px;font-size:12px;line-height:1.5">
+                                <div style="font-size:9px;opacity:0.7;margin-bottom:4px">You</div>
+                                {msg["content"]}
+                            </div>
+                            ''', unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'''
+                            <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#f5f5f0;padding:10px 14px;border-radius:16px 16px 16px 4px;margin:8px 40px 8px 0;font-size:12px;line-height:1.5">
+                                <div style="font-size:9px;color:#f59e0b;margin-bottom:4px">Interviewer</div>
+                                {msg["content"]}
+                            </div>
+                            ''', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div style="text-align:center;color:#6b8068;font-size:12px;padding:30px">Interview starting...</div>', unsafe_allow_html=True)
             
-            # Code editor (for coding stage)
-            if current_stage in ["coding", "optimization"]:
-                st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">solution.py</span></div></div>', unsafe_allow_html=True)
-                code = st.text_area("", value=st.session_state.interview_code, height=100, key="iv_code_editor", label_visibility="collapsed")
+            # Code Editor (Show in coding/optimization stages)
+            if current_stage in ["coding", "optimization", "approach"]:
+                st.markdown('''
+                <div style="margin-top:10px">
+                    <div style="background:rgba(15,26,20,0.8);padding:10px 14px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,0.06);border-bottom:none">
+                        <span style="width:8px;height:8px;border-radius:50%;background:#f87171"></span>
+                        <span style="width:8px;height:8px;border-radius:50%;background:#fbbf24"></span>
+                        <span style="width:8px;height:8px;border-radius:50%;background:#4ade80"></span>
+                        <span style="font-size:11px;color:#6b8068;font-family:'JetBrains Mono';margin-left:10px">solution.py</span>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+                code = st.text_area("", value=st.session_state.interview_code, height=90, key="iv_code_editor", label_visibility="collapsed")
                 st.session_state.interview_code = code
             
-            # Input and send
-            iv_input = st.text_input("", placeholder="Your response...", key="iv_input", label_visibility="collapsed")
+            # Quick Response Buttons Based on Stage
+            stage_quick_responses = {
+                "intro": ["I have a question", "I understand, let me think", "Can you clarify the input format?", "I'm ready to discuss my approach"],
+                "approach": ["I'll use a hash map", "Let me consider edge cases", "The time complexity would be O(n)", "I'll iterate through the array"],
+                "coding": ["Let me walk through the code", "I need to handle edge cases", "This part handles the main logic", "I'm testing with an example"],
+                "optimization": ["The current time complexity is O(n)", "We could use memoization", "Space complexity is O(1)", "A better approach would be..."],
+                "behavioral": ["In my previous role...", "I learned that...", "The outcome was...", "I would handle it by..."],
+                "wrapup": ["What's the team structure?", "What technologies do you use?", "Thank you for the interview", "What are the next steps?"]
+            }
             
-            iv_c1, iv_c2 = st.columns([4, 1])
-            with iv_c1:
-                if st.button("Send →", type="primary", use_container_width=True, key="iv_send"):
+            quick_resps = stage_quick_responses.get(current_stage, [])
+            if quick_resps:
+                st.markdown('<div style="font-size:9px;color:#6b8068;margin:10px 0 6px">Quick responses:</div>', unsafe_allow_html=True)
+                qr_cols = st.columns(2)
+                for i, qr in enumerate(quick_resps[:4]):
+                    with qr_cols[i % 2]:
+                        if st.button(qr[:25] + ("..." if len(qr) > 25 else ""), key=f"qr_{i}", use_container_width=True):
+                            code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
+                            engine.process_response(qr, code)
+                            if engine.state.current_stage == InterviewStage.COMPLETED:
+                                st.session_state.interview_feedback_shown = True
+                            st.rerun()
+        
+            # Custom Input
+            st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+            placeholder_text = stage_info.get("goal", "Type your response or use quick buttons above...")
+            iv_input = st.text_input("Your response", placeholder=placeholder_text, key="iv_input", label_visibility="collapsed")
+            
+            send_col, end_col = st.columns([4, 1])
+            with send_col:
+                if st.button("Send Response", type="primary", use_container_width=True, key="iv_send"):
                     if iv_input:
-                        code = st.session_state.interview_code if current_stage in ["coding", "optimization"] else ""
-                        response = engine.process_response(iv_input, code)
-                        
-                        # Check if interview is complete
+                        code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
+                        engine.process_response(iv_input, code)
                         if engine.state.current_stage == InterviewStage.COMPLETED:
                             st.session_state.interview_feedback_shown = True
-                        
                         st.rerun()
-            with iv_c2:
-                if st.button("End", key="iv_end"):
+            with end_col:
+                if st.button("X", key="iv_end", help="End Interview"):
                     engine.force_end_interview()
                     st.session_state.interview_feedback_shown = True
                     st.rerun()
-            
-            # Check for time up
+        
+            # Auto-end on time up
             if progress["is_time_up"] and not st.session_state.interview_feedback_shown:
+                st.warning("Time's up! Generating your feedback...")
                 engine.force_end_interview()
                 st.session_state.interview_feedback_shown = True
                 st.rerun()
     
     elif st.session_state.stage is None:
-        st.markdown('<div class="welcome"><div class="welcome-icon w-purple">💻</div><div class="welcome-title">Welcome to<br/>Code Editor</div><div class="welcome-sub">Select a problem to start coding</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="welcome"><div class="welcome-icon">&lt;/&gt;</div><div class="welcome-title">Welcome to<br/>Code Editor</div><div class="welcome-sub">Select a problem from the left panel to start coding</div></div>', unsafe_allow_html=True)
+        
+        st.markdown("<div style='height:24px'></div>", unsafe_allow_html=True)
         
         b1, b2, b3 = st.columns(3)
         with b1:
-            if st.button("🌱 Easy", use_container_width=True, type="primary"):
+            if st.button("Easy", use_container_width=True, type="primary"):
                 st.session_state.selected_difficulty = "Basic"
                 go_to("Basic", next_q("Basic"))
                 st.rerun()
         with b2:
-            if st.button("🌿 Medium", use_container_width=True):
+            if st.button("Medium", use_container_width=True):
                 st.session_state.selected_difficulty = "Intermediate"
                 go_to("Intermediate", next_q("Intermediate"))
                 st.rerun()
         with b3:
-            if st.button("🔥 Hard", use_container_width=True):
+            if st.button("Hard", use_container_width=True):
                 st.session_state.selected_difficulty = "Advanced"
                 go_to("Advanced", next_q("Advanced"))
                 st.rerun()
+    
     else:
+        # Code Editor - when a problem IS selected
         stage = st.session_state.stage
         qi = st.session_state.q_index
         data = QUESTIONS[stage][qi]
@@ -657,14 +1720,14 @@ with c2:
         
         n1, n2, n3 = st.columns([1, 2, 1])
         with n1:
-            if st.button("⬅️", key="back"):
+            if st.button("←", key="back"):
                 st.session_state.stage = None
                 st.rerun()
         with n2:
-            st.markdown(f'<div style="text-align:center;font-weight:700;color:#d8b4fe;padding:6px">{stage} • Q{qi+1}/{t}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="text-align:center;font-weight:600;color:#f59e0b;padding:8px;font-size:0.95rem">{stage} • Q{qi+1}/{t}</div>', unsafe_allow_html=True)
         with n3:
             if qi < t - 1:
-                if st.button("➡️", key="next"):
+                if st.button("→", key="next"):
                     go_to(stage, qi + 1)
                     st.rerun()
         
@@ -675,7 +1738,7 @@ with c2:
         if st.session_state.timer_start is None:
             st.session_state.timer_start = time.time()
         if not st.session_state.passed:
-            st.markdown(f'<div class="timer">⏱️ {format_time(time.time() - st.session_state.timer_start)}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="timer">{format_time(time.time() - st.session_state.timer_start)}</div>', unsafe_allow_html=True)
         
         tc = data["test_cases"]
         if not tc:
@@ -690,18 +1753,18 @@ with c2:
         
         st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">solution.py</span></div></div>', unsafe_allow_html=True)
         
-        code = st.text_area("", value=template, height=100, key=f"code_{stage}_{qi}", label_visibility="collapsed")
+        code = st.text_area("", value=template, height=120, key=f"code_{stage}_{qi}", label_visibility="collapsed")
         
         btn1, btn2, btn3 = st.columns(3)
         with btn1:
-            run_btn = st.button("▶️ Run", type="primary", use_container_width=True)
+            run_btn = st.button("Run", type="primary", use_container_width=True)
         with btn2:
-            hint_btn = st.button("💡 Hint", use_container_width=True)
+            hint_btn = st.button("Hint", use_container_width=True)
         with btn3:
-            skip_btn = st.button("⏭️ Skip", use_container_width=True)
+            skip_btn = st.button("Skip", use_container_width=True)
         
         if hint_btn:
-            with st.spinner("🤔"):
+            with st.spinner("Thinking..."):
                 try:
                     st.session_state.ai_hint = builtin_smart_hint(code, data['question'], data['function'], data.get('hints', []), st.session_state.show_hint + 1)
                     st.session_state.show_hint += 1
@@ -709,34 +1772,33 @@ with c2:
                     st.session_state.ai_hint = str(e)
         
         if st.session_state.ai_hint:
-            st.markdown(f'<div class="msg-hint">💡 {st.session_state.ai_hint}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="msg-hint">{st.session_state.ai_hint}</div>', unsafe_allow_html=True)
         
         if run_btn:
             ok, msg = evaluate_user_code(code, data["function"], data["test_cases"])
             if ok:
                 el = time.time() - st.session_state.timer_start
-                st.markdown(f'<div class="msg-ok">✅ All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="msg-ok">All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
                 st.session_state.passed = True
                 st.session_state.progress[stage]["completed"].add(qi)
                 st.session_state.progress[stage]["skipped"].discard(qi)
                 st.session_state.progress = save_question_time(st.session_state.progress, stage, qi, el)
                 save_progress(st.session_state.progress)
-                with st.spinner("📝"):
+                with st.spinner("Analyzing..."):
                     try:
                         st.session_state.ai_feedback = builtin_code_review(code, data['question'], data['function'], el)
                     except Exception:
                         pass
-            else:
-                st.markdown(f'<div class="msg-err">❌ {msg}</div>', unsafe_allow_html=True)
-                with st.spinner("🔍"):
+                st.markdown(f'<div class="msg-err">{msg}</div>', unsafe_allow_html=True)
+                with st.spinner("Analyzing..."):
                     try:
                         bug = builtin_bug_hint(code, msg, data['question'], data['function'])
-                        st.markdown(f'<div class="msg-hint">🔍 {bug}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="msg-hint">{bug}</div>', unsafe_allow_html=True)
                     except Exception:
                         pass
         
         if st.session_state.ai_feedback:
-            st.markdown(f'<div class="msg-hint">📝 {st.session_state.ai_feedback}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="msg-hint">{st.session_state.ai_feedback}</div>', unsafe_allow_html=True)
         
         if skip_btn:
             if qi not in st.session_state.progress[stage]["completed"]:
@@ -746,64 +1808,15 @@ with c2:
             st.rerun()
         
         st.markdown('<div class="section-title sec-purple">TEST CASES</div>', unsafe_allow_html=True)
-        for inp, exp in data["test_cases"][:2]:
-            st.markdown(f'<div class="test-case"><span class="test-lbl">In:</span> {inp} → <span class="test-lbl">Out:</span> {exp}</div>', unsafe_allow_html=True)
+        for inp, exp in data["test_cases"][:3]:
+            st.markdown(f'<div class="test-case"><span class="test-lbl">Input:</span> {inp} → <span class="test-lbl">Output:</span> {exp}</div>', unsafe_allow_html=True)
 
-# RIGHT PHONE - AI CHAT
-with c3:
-    st.markdown('<div class="notch"><div class="notch-cam"></div><div class="notch-led"></div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="status-bar status-bar-coral"><span>9:41</span><span>📶 🔋 100%</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="phone-header phone-header-coral"><span class="phone-title title-coral">AI Chat</span><div class="avatar av-coral">🤖</div></div>', unsafe_allow_html=True)
-    
-    if not st.session_state.chat_history:
-        st.markdown('<div class="welcome"><div class="welcome-icon w-coral">🤖</div><div class="welcome-title">Welcome to<br/>AI Chat</div></div>', unsafe_allow_html=True)
-        st.markdown('<div class="chat-btns"><div class="chat-btn"><div class="chat-icon" style="background:linear-gradient(135deg,#ff9500,#ff5e3a)">📝</div><span class="chat-label">Python</span></div><div class="chat-btn"><div class="chat-icon" style="background:linear-gradient(135deg,#30d158,#00c853)">🔧</div><span class="chat-label">Selenium</span></div><div class="chat-btn"><div class="chat-icon" style="background:linear-gradient(135deg,#bf5af2,#9945ff)">🤖</div><span class="chat-label">Robot</span></div></div>', unsafe_allow_html=True)
-    else:
-        with st.container(height=350):
-            for m in st.session_state.chat_history[-8:]:
-                if m["role"] == "user":
-                    st.markdown(f'<div class="msg msg-user">{m["content"]}</div>', unsafe_allow_html=True)
-                else:
-                    # Show full response, not truncated
-                    st.markdown(f'<div class="msg msg-ai">{m["content"]}</div>', unsafe_allow_html=True)
-    
-    user_msg = st.text_input("", placeholder="Ask about Python, Selenium, Robot Framework...", key="chat_in", label_visibility="collapsed")
-    
-    send_col, clear_col = st.columns([4, 1])
-    with send_col:
-        send_btn = st.button("Send →", type="primary", use_container_width=True, key="send")
-    with clear_col:
-        if st.button("🗑️", key="clear"):
-            st.session_state.chat_history = []
-            st.rerun()
-    
-    if send_btn and user_msg:
-        st.session_state.chat_history.append({"role": "user", "content": user_msg})
-        with st.spinner("🤖"):
-            try:
-                context = get_chat_context()
-                enhanced_msg = f"{context}\nCurrent question: {user_msg}" if context else user_msg
-                
-                if st.session_state.stage:
-                    d = QUESTIONS[st.session_state.stage][st.session_state.q_index]
-                    cc = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "")
-                    resp = builtin_chat(enhanced_msg, d['question'], d['function'], cc, False)
-                else:
-                    resp = builtin_chat(enhanced_msg, "", "", "", False)
-                st.session_state.chat_history.append({"role": "assistant", "content": resp})
-            except Exception as e:
-                st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)[:50]}"})
-        st.rerun()
-    
-    st.markdown('<div class="section-title sec-coral">QUICK PROMPTS</div>', unsafe_allow_html=True)
-    qp1, qp2 = st.columns(2)
-    with qp1:
-        if st.button("Explain 📖", use_container_width=True, key="qp1"):
-            st.session_state.chat_history.append({"role": "user", "content": "Explain this problem in detail"})
-            st.rerun()
-    with qp2:
-        if st.button("Help 💡", use_container_width=True, key="qp2"):
-            st.session_state.chat_history.append({"role": "user", "content": "Give me a hint to solve this"})
-            st.rerun()
-
-st.markdown('<div style="text-align:center;padding:10px;color:#6b7280;font-size:0.65rem">Made with ❤️ • <span style="background:linear-gradient(90deg,#00e5ff,#bf5af2,#ff453a);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:700">PyCode AI</span></div>', unsafe_allow_html=True)
+# Footer
+st.markdown('''
+<div style="text-align:center;padding:24px 0;margin-top:20px">
+    <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.3),rgba(191,0,255,0.3),transparent);margin-bottom:16px"></div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:0.65rem;color:#4a6380;letter-spacing:3px">
+        ENGINEERED WITH <span style="color:#00f5ff;text-shadow:0 0 10px #00f5ff">◆</span> PYCODE AI
+    </div>
+</div>
+''', unsafe_allow_html=True)

@@ -125,32 +125,49 @@ Current Problem Context:
 # PDF KNOWLEDGE BASE INTEGRATION
 # =============================================================================
 
-# Try to import PDF knowledge base (optional dependency)
+# PDF Knowledge Base - Lazy Loading to avoid slow startup
+# The sentence_transformers/torch import is very slow, so we only load when needed
 PDF_KB_AVAILABLE = False
 _pdf_kb_initialized = False
+_pdf_kb_module = None
 
-try:
-    from pdf_knowledge_base import (
-        get_knowledge_base,
-        initialize_knowledge_base,
-        query_knowledge,
-        is_knowledge_base_ready
-    )
-    PDF_KB_AVAILABLE = True
-except ImportError:
-    # PDF knowledge base not available - will use manual concepts only
-    pass
-
+def _get_pdf_kb_module():
+    """Lazy import of PDF knowledge base module to avoid slow startup."""
+    global _pdf_kb_module, PDF_KB_AVAILABLE
+    if _pdf_kb_module is None:
+        try:
+            import pdf_knowledge_base as kb
+            _pdf_kb_module = kb
+            PDF_KB_AVAILABLE = True
+        except ImportError:
+            PDF_KB_AVAILABLE = False
+    return _pdf_kb_module
 
 def _ensure_pdf_kb_initialized():
     """Lazy initialization of PDF knowledge base."""
-    global _pdf_kb_initialized
-    if PDF_KB_AVAILABLE and not _pdf_kb_initialized:
+    global _pdf_kb_initialized, PDF_KB_AVAILABLE
+    kb = _get_pdf_kb_module()
+    if kb and not _pdf_kb_initialized:
         try:
-            initialize_knowledge_base()
+            kb.initialize_knowledge_base()
             _pdf_kb_initialized = True
         except Exception:
             pass  # Silently fail - will use fallback
+
+def query_knowledge(query: str) -> str:
+    """Query the PDF knowledge base if available."""
+    kb = _get_pdf_kb_module()
+    if kb and _pdf_kb_initialized:
+        try:
+            return kb.query_knowledge(query)
+        except Exception:
+            pass
+    return ""
+
+def is_knowledge_base_ready() -> bool:
+    """Check if knowledge base is ready."""
+    kb = _get_pdf_kb_module()
+    return kb is not None and _pdf_kb_initialized
 
 
 # =============================================================================
@@ -5993,6 +6010,260 @@ def _handle_multiple_topics(user_message: str) -> Optional[str]:
     return response
 
 
+# =============================================================================
+# CODE EXPLANATION FEATURE
+# =============================================================================
+
+def explain_code(code: str) -> str:
+    """
+    Generate a detailed line-by-line explanation of Python code.
+    
+    Args:
+        code: Python code to explain
+        
+    Returns:
+        Detailed explanation with line-by-line breakdown
+    """
+    if not code or not code.strip():
+        return """## 📝 Code Explanation
+
+I'd be happy to explain code for you! Please paste some Python code and I'll break it down line by line.
+
+**Example request:**
+```
+Explain this code:
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+```"""
+    
+    lines = code.strip().split('\n')
+    
+    # Analyze the code structure
+    has_function = bool(re.search(r'\bdef\s+\w+\s*\(', code))
+    has_class = bool(re.search(r'\bclass\s+\w+', code))
+    has_loop = bool(re.search(r'\b(for|while)\b', code))
+    has_conditional = bool(re.search(r'\bif\b', code))
+    has_import = bool(re.search(r'\b(import|from)\b', code))
+    has_list_comp = bool(re.search(r'\[.*for.*in.*\]', code))
+    has_recursion = False
+    
+    # Detect function name and check for recursion
+    func_match = re.search(r'def\s+(\w+)\s*\(', code)
+    func_name = func_match.group(1) if func_match else None
+    if func_name and func_name in code[code.find('def '):]:
+        # Check if function calls itself
+        has_recursion = bool(re.search(rf'\b{func_name}\s*\(', code[code.find('):'):]))
+    
+    response = "## 🔍 Code Explanation\n\n"
+    
+    # Overview
+    response += "### Overview\n"
+    if has_class:
+        class_match = re.search(r'class\s+(\w+)', code)
+        class_name = class_match.group(1) if class_match else "Class"
+        response += f"This code defines a **class `{class_name}`**.\n\n"
+    elif has_function:
+        response += f"This code defines a **function `{func_name}`**.\n\n"
+    else:
+        response += "This is a **code snippet** with the following elements:\n\n"
+    
+    # Key concepts used
+    concepts = []
+    if has_function:
+        concepts.append("Function definition")
+    if has_class:
+        concepts.append("Class/OOP")
+    if has_loop:
+        concepts.append("Loops")
+    if has_conditional:
+        concepts.append("Conditionals")
+    if has_list_comp:
+        concepts.append("List comprehension")
+    if has_recursion:
+        concepts.append("Recursion")
+    if has_import:
+        concepts.append("Module imports")
+    
+    if concepts:
+        response += f"**Concepts used:** {', '.join(concepts)}\n\n"
+    
+    # Line-by-line explanation
+    response += "### Line-by-Line Breakdown\n\n"
+    response += "```python\n"
+    
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if stripped:
+            response += f"{i}: {line}\n"
+    
+    response += "```\n\n"
+    
+    # Explain each significant line
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith('#'):
+            continue
+            
+        explanation = _explain_line(stripped, i)
+        if explanation:
+            response += f"**Line {i}:** {explanation}\n\n"
+    
+    # Summary
+    response += "### Summary\n"
+    if has_recursion:
+        response += f"- This is a **recursive function** - `{func_name}` calls itself\n"
+        response += "- Make sure there's a base case to prevent infinite recursion\n"
+    if has_loop and has_conditional:
+        response += "- Uses iteration with conditional logic\n"
+    if has_list_comp:
+        response += "- Uses Pythonic list comprehension for concise code\n"
+    
+    response += "\n💡 **Need more detail on any part?** Just ask!"
+    
+    return response
+
+
+def _explain_line(line: str, line_num: int) -> str:
+    """Generate explanation for a single line of code."""
+    
+    # Function definition
+    if line.startswith('def '):
+        match = re.match(r'def\s+(\w+)\s*\((.*?)\)', line)
+        if match:
+            name, params = match.groups()
+            param_list = [p.strip() for p in params.split(',') if p.strip()]
+            if param_list:
+                return f"Defines function `{name}` with parameters: `{', '.join(param_list)}`"
+            return f"Defines function `{name}` with no parameters"
+    
+    # Class definition
+    if line.startswith('class '):
+        match = re.match(r'class\s+(\w+)(?:\((.*?)\))?', line)
+        if match:
+            name, parent = match.groups()
+            if parent:
+                return f"Defines class `{name}` inheriting from `{parent}`"
+            return f"Defines class `{name}`"
+    
+    # Return statement
+    if line.startswith('return '):
+        value = line[7:].strip()
+        return f"Returns the value: `{value}`"
+    
+    # If statement
+    if line.startswith('if '):
+        condition = line[3:].rstrip(':')
+        return f"Checks condition: `{condition}`"
+    
+    # Elif statement
+    if line.startswith('elif '):
+        condition = line[5:].rstrip(':')
+        return f"Alternative condition: `{condition}`"
+    
+    # Else statement
+    if line == 'else:':
+        return "Executes if no previous conditions were true"
+    
+    # For loop
+    if line.startswith('for '):
+        match = re.match(r'for\s+(\w+)\s+in\s+(.+?):', line)
+        if match:
+            var, iterable = match.groups()
+            return f"Loops through `{iterable}`, assigning each item to `{var}`"
+    
+    # While loop
+    if line.startswith('while '):
+        condition = line[6:].rstrip(':')
+        return f"Loops while condition `{condition}` is true"
+    
+    # Import statement
+    if line.startswith('import '):
+        module = line[7:].strip()
+        return f"Imports the `{module}` module"
+    
+    if line.startswith('from '):
+        match = re.match(r'from\s+(\S+)\s+import\s+(.+)', line)
+        if match:
+            module, items = match.groups()
+            return f"Imports `{items}` from the `{module}` module"
+    
+    # Assignment
+    if '=' in line and not any(op in line for op in ['==', '!=', '<=', '>=']):
+        parts = line.split('=', 1)
+        if len(parts) == 2:
+            var = parts[0].strip()
+            val = parts[1].strip()
+            # Check for augmented assignment
+            if var.endswith(('+', '-', '*', '/', '%', '&', '|', '^')):
+                op = var[-1]
+                var = var[:-1].strip()
+                return f"Updates `{var}` using `{op}=` with `{val}`"
+            return f"Assigns `{val}` to variable `{var}`"
+    
+    # Print statement
+    if line.startswith('print('):
+        content = line[6:-1] if line.endswith(')') else line[6:]
+        return f"Prints: `{content}`"
+    
+    # Method call
+    if '.' in line and '(' in line:
+        match = re.match(r'(\w+)\.(\w+)\((.*?)\)', line)
+        if match:
+            obj, method, args = match.groups()
+            return f"Calls method `{method}` on `{obj}`"
+    
+    # List/dict/set comprehension
+    if '[' in line and 'for' in line and 'in' in line:
+        return "List comprehension - creates a list in a single line"
+    
+    if '{' in line and 'for' in line and 'in' in line:
+        if ':' in line:
+            return "Dictionary comprehension - creates a dict in a single line"
+        return "Set comprehension - creates a set in a single line"
+    
+    return ""
+
+
+def _detect_code_explanation_request(message: str) -> Optional[str]:
+    """
+    Detect if user is asking to explain code and extract the code.
+    
+    Returns:
+        The code to explain, or None if not a code explanation request
+    """
+    msg_lower = message.lower()
+    
+    # Check for code explanation patterns
+    explain_patterns = [
+        r'explain\s+(?:this\s+)?code[:\s]*(.+)',
+        r'what\s+does\s+this\s+code\s+(?:do|mean)[:\s]*(.+)',
+        r'break\s*down\s+(?:this\s+)?code[:\s]*(.+)',
+        r'explain\s+line\s*by\s*line[:\s]*(.+)',
+        r'how\s+does\s+this\s+(?:code\s+)?work[:\s]*(.+)',
+    ]
+    
+    for pattern in explain_patterns:
+        match = re.search(pattern, message, re.IGNORECASE | re.DOTALL)
+        if match:
+            code = match.group(1).strip()
+            # Clean up common prefixes
+            code = re.sub(r'^[:\s-]+', '', code)
+            if code and ('def ' in code or '=' in code or 'for ' in code or 'if ' in code or 'class ' in code):
+                return code
+    
+    # Check if message starts with code directly after "explain"
+    if 'explain' in msg_lower and ('def ' in message or 'class ' in message):
+        # Find where code starts
+        for marker in ['def ', 'class ', 'import ', 'from ']:
+            if marker in message:
+                idx = message.find(marker)
+                return message[idx:].strip()
+    
+    return None
+
+
 def generate_response(
     user_message: str,
     question: str = "",
@@ -6002,11 +6273,57 @@ def generate_response(
 ) -> str:
     """Generate a comprehensive, helpful response based on user input."""
     
-    msg_lower = user_message.lower()
+    msg_lower = user_message.lower().strip()
     
     # Interview mode - act like a technical interviewer
     if interview_mode:
         return generate_interview_response(user_message, question, function_name, user_code)
+    
+    # ==========================================================================
+    # CODE EXPLANATION REQUEST - Handle "explain this code" requests
+    # ==========================================================================
+    code_to_explain = _detect_code_explanation_request(user_message)
+    if code_to_explain:
+        return explain_code(code_to_explain)
+    
+    # Also check if user is asking to explain their current code
+    if user_code and any(phrase in msg_lower for phrase in ["explain my code", "explain this code", "what does my code do", "explain code"]):
+        return explain_code(user_code)
+    
+    # ==========================================================================
+    # DIRECT CONCEPT NAME DETECTION - Handle queries like "Robot Framework", "Selenium", etc.
+    # ==========================================================================
+    direct_concept_names = [
+        # Automation concepts
+        "robot framework", "selenium", "selenium webdriver", "pytest", "unittest",
+        "page object model", "pom", "xpath", "css selector", "webdriver",
+        "selenium grid", "selenium waits", "selenium locators", "selenium actions",
+        "robot framework keywords", "robot framework variables", "robot framework libraries",
+        "seleniumlibrary", "pabot", "allure", "jenkins", "docker",
+        # Python concepts
+        "python", "list", "dictionary", "tuple", "set", "string", "function", "class",
+        "loop", "for loop", "while loop", "if else", "exception", "decorator", "generator",
+        "lambda", "comprehension", "list comprehension", "inheritance", "polymorphism",
+        "encapsulation", "abstraction", "recursion", "module", "package"
+    ]
+    
+    # Check if the message IS a concept name (with optional punctuation)
+    clean_msg = msg_lower.replace("?", "").replace("!", "").replace(".", "").strip()
+    
+    for concept_name in direct_concept_names:
+        if clean_msg == concept_name or clean_msg == f"about {concept_name}":
+            # Direct automation concept match
+            if AUTOMATION_CONCEPTS_AVAILABLE:
+                auto_match = _match_automation_concept(concept_name, concept_name.split())
+                if auto_match:
+                    return auto_match
+            # Check Python concepts
+            if concept_name in CONCEPTS:
+                return CONCEPTS[concept_name]
+            # Try partial match in CONCEPTS
+            for key in CONCEPTS:
+                if concept_name in key or key in concept_name:
+                    return CONCEPTS[key]
     
     # Check for multiple topics first (e.g., "explain loops, classes, functions")
     multi_topic_response = _handle_multiple_topics(user_message)
@@ -6017,7 +6334,7 @@ def generate_response(
     concept_keywords = ["what is", "what are", "explain", "how does", "how do", "how to",
                        "tell me about", "teach me", "define", "why do we", "why is", "why are", 
                        "why use", "why should", "why need", "what's", "whats", "describe",
-                       "show me", "give me example", "example of"]
+                       "show me", "give me example", "example of", "about"]
     is_concept_question = any(keyword in msg_lower for keyword in concept_keywords)
     
     if is_concept_question:
