@@ -871,7 +871,7 @@ def format_response_html(content: str) -> str:
 
 @st.dialog("AI Chat Assistant", width="large")
 def show_chat_modal():
-    """Enhanced AI Chat Modal with ChatGPT-like features: Run Code, Copy, Regenerate, Response Modes"""
+    """Redesigned AI Chat with wider chat area and compact sidebar controls"""
     
     # Initialize chat states
     if "chat_tab" not in st.session_state:
@@ -879,13 +879,13 @@ def show_chat_modal():
     if "chat_loading" not in st.session_state:
         st.session_state.chat_loading = False
     if "response_mode" not in st.session_state:
-        st.session_state.response_mode = "detailed"  # "concise" or "detailed"
+        st.session_state.response_mode = "detailed"
     if "code_output" not in st.session_state:
         st.session_state.code_output = None
     if "last_user_msg" not in st.session_state:
         st.session_state.last_user_msg = None
     
-    # Enhanced CSS for chat modal
+    # Enhanced CSS for new layout
     st.markdown("""
     <style>
     [data-testid="stDialog"] > div { 
@@ -893,309 +893,293 @@ def show_chat_modal():
         border: 2px solid rgba(0, 245, 255, 0.3) !important; 
         border-radius: 20px !important;
         box-shadow: 0 0 50px rgba(0, 245, 255, 0.2), inset 0 0 30px rgba(0, 245, 255, 0.03) !important;
+        max-width: 95vw !important;
+        width: 95vw !important;
     }
     [data-testid="stDialog"] .stMarkdown p { color: #e8f4f8 !important; }
     [data-testid="stDialog"] .stMarkdown li { color: #e8f4f8 !important; }
-    [data-testid="stDialog"] .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background: rgba(0,0,0,0.3);
-        padding: 8px;
-        border-radius: 12px;
-    }
-    [data-testid="stDialog"] .stTabs [data-baseweb="tab"] {
-        background: rgba(0,245,255,0.08) !important;
-        border-radius: 8px !important;
-        color: #8fa3b8 !important;
-        padding: 8px 16px !important;
-        font-size: 12px !important;
-    }
-    [data-testid="stDialog"] .stTabs [aria-selected="true"] {
-        background: linear-gradient(135deg, rgba(0,245,255,0.25), rgba(191,0,255,0.15)) !important;
-        color: #00f5ff !important;
-        border: 1px solid rgba(0,245,255,0.4) !important;
-    }
     @keyframes typing {
         0%, 80%, 100% { opacity: 0.3; }
         40% { opacity: 1; }
     }
     .typing-dot { 
-        display: inline-block; 
-        width: 8px; 
-        height: 8px; 
-        border-radius: 50%; 
-        background: #00f5ff;
-        margin: 0 3px;
-        animation: typing 1.4s infinite;
+        display: inline-block; width: 8px; height: 8px; border-radius: 50%; 
+        background: #00f5ff; margin: 0 3px; animation: typing 1.4s infinite;
     }
     .typing-dot:nth-child(2) { animation-delay: 0.2s; }
     .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    .code-output {
-        background: #0d1117;
-        border: 1px solid rgba(0,255,136,0.3);
-        border-radius: 8px;
-        padding: 10px 14px;
-        margin-top: 8px;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 12px;
+    .sidebar-section { 
+        background: rgba(0,20,40,0.5); border: 1px solid rgba(0,245,255,0.15); 
+        border-radius: 10px; padding: 10px; margin-bottom: 10px;
     }
-    .code-output-success { border-color: rgba(0,255,136,0.4); }
-    .code-output-error { border-color: rgba(255,100,100,0.4); }
+    .sidebar-label { 
+        font-size: 9px; color: #4a6380; letter-spacing: 1.5px; 
+        margin-bottom: 6px; font-weight: 600;
+    }
+    .chat-msg-user {
+        background: linear-gradient(135deg, #00ff88, #00cc6a); color: #030508;
+        padding: 12px 16px; border-radius: 16px 16px 4px 16px; margin: 10px 0 10px 60px;
+        font-size: 13px; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,255,136,0.25);
+    }
+    .chat-msg-ai {
+        background: linear-gradient(135deg, rgba(0,245,255,0.1), rgba(10,20,40,0.95));
+        border: 1px solid rgba(0,245,255,0.25); color: #e8f4f8;
+        padding: 14px 18px; border-radius: 16px 16px 16px 4px; margin: 10px 60px 10px 0;
+        font-size: 13px; line-height: 1.6; box-shadow: 0 4px 15px rgba(0,245,255,0.1);
+    }
+    .prompt-btn { 
+        font-size: 11px !important; padding: 6px 10px !important; 
+        margin: 3px 0 !important; border-radius: 8px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
-    # Chat header with Response Mode Toggle
-    hdr_col1, hdr_col2 = st.columns([3, 1])
-    with hdr_col1:
-        st.markdown("""
-        <div style="display:flex;align-items:center;gap:14px">
-            <div style="width:45px;height:45px;border-radius:12px;background:linear-gradient(135deg,rgba(0,245,255,0.15),rgba(191,0,255,0.1));border:2px solid rgba(0,245,255,0.4);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#00f5ff;text-shadow:0 0 15px rgba(0,245,255,0.7)">&lt;/&gt;</div>
-            <div>
-                <div style="font-family:'Orbitron',sans-serif;font-size:1rem;font-weight:700;color:#ffffff;letter-spacing:1px">AI ASSISTANT</div>
-                <div style="font-size:0.7rem;color:#8fa3b8">Python • Selenium • Robot Framework</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    with hdr_col2:
-        # Response Mode Toggle
-        mode_label = "📝 Detailed" if st.session_state.response_mode == "detailed" else "⚡ Concise"
-        if st.button(mode_label, key="mode_toggle", use_container_width=True, help="Toggle response length"):
-            st.session_state.response_mode = "concise" if st.session_state.response_mode == "detailed" else "detailed"
-            st.session_state.reopen_chat = True
-            st.rerun()
-    
-    st.markdown('<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.3),transparent);margin:12px 0"></div>', unsafe_allow_html=True)
-    
-    # Process pending message if exists
+    # Process pending message
     if st.session_state.get("pending_chat_msg"):
         msg = st.session_state.pending_chat_msg
         st.session_state.pending_chat_msg = None
-        st.session_state.last_user_msg = msg  # Store for regenerate
+        st.session_state.last_user_msg = msg
         st.session_state.chat_history.append({"role": "user", "content": msg})
         st.session_state.chat_loading = True
         try:
-            context = get_chat_context()
-            # Add response mode instruction
-            mode_instruction = "Be concise, use bullet points, keep under 100 words." if st.session_state.response_mode == "concise" else ""
-            enhanced_msg = f"{mode_instruction}\n{context}\nCurrent question: {msg}" if context or mode_instruction else msg
+            # Pass raw user message to generate_response for clean concept matching
+            # Don't concatenate mode/context - it confuses topic detection
             if st.session_state.stage:
                 d = QUESTIONS[st.session_state.stage][st.session_state.q_index]
                 cc = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "")
-                resp = builtin_chat(enhanced_msg, d['question'], d['function'], cc, False)
+                resp = builtin_chat(msg, d['question'], d['function'], cc, False)
             else:
-                resp = builtin_chat(enhanced_msg, "", "", "", False)
+                resp = builtin_chat(msg, "", "", "", False)
             st.session_state.chat_history.append({"role": "assistant", "content": resp})
         except Exception as e:
             st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)[:100]}"})
         st.session_state.chat_loading = False
-        st.session_state.code_output = None  # Clear previous code output
+        st.session_state.code_output = None
     
-    # Chat messages container
-    chat_container = st.container(height=220)
-    with chat_container:
-        if not st.session_state.chat_history:
-            st.markdown(f"""
-            <div style="text-align:center;padding:30px 20px">
-                <div style="font-size:42px;margin-bottom:12px;text-shadow:0 0 30px rgba(0,245,255,0.5)">🤖</div>
-                <div style="font-family:'Orbitron',sans-serif;font-size:0.95rem;font-weight:600;color:#ffffff;margin-bottom:6px;letter-spacing:1px">START A CONVERSATION</div>
-                <div style="color:#8fa3b8;font-size:0.8rem;line-height:1.5">
-                    Mode: <span style="color:{'#00ff88' if st.session_state.response_mode == 'concise' else '#00f5ff'}">{'⚡ Concise' if st.session_state.response_mode == 'concise' else '📝 Detailed'}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            for idx, m in enumerate(st.session_state.chat_history[-10:]):
-                if m["role"] == "user":
-                    st.markdown(f'''
-                    <div style="background:linear-gradient(135deg,#00ff88,#00cc6a);color:#030508;padding:10px 14px;border-radius:12px 12px 4px 12px;margin:8px 0 8px 40px;font-size:12px;line-height:1.4;box-shadow:0 0 12px rgba(0,255,136,0.2)">
-                        <div style="font-size:8px;font-weight:600;opacity:0.7;margin-bottom:3px;letter-spacing:1px">YOU</div>
-                        {m["content"][:400]}{"..." if len(m["content"]) > 400 else ""}
-                    </div>
-                    ''', unsafe_allow_html=True)
-                else:
-                    formatted = format_response_html(m["content"])
-                    st.markdown(f'''
-                    <div style="background:linear-gradient(135deg,rgba(0,245,255,0.08),rgba(10,20,40,0.95));border:1px solid rgba(0,245,255,0.2);color:#e8f4f8;padding:12px 16px;border-radius:12px 12px 12px 4px;margin:8px 40px 8px 0;font-size:12px;line-height:1.5;box-shadow:0 0 12px rgba(0,245,255,0.08)">
-                        <div style="font-size:8px;font-weight:600;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
-                        <div style="color:#e8f4f8">{formatted}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            
-            # Show typing indicator if loading
-            if st.session_state.get("chat_loading"):
-                st.markdown('''
-                <div style="background:rgba(0,245,255,0.08);border:1px solid rgba(0,245,255,0.2);padding:12px 16px;border-radius:12px;margin:8px 40px 8px 0;display:inline-block">
-                    <div style="font-size:8px;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
-                    <span class="typing-dot"></span>
-                    <span class="typing-dot"></span>
-                    <span class="typing-dot"></span>
-                </div>
-                ''', unsafe_allow_html=True)
+    # ========== MAIN LAYOUT: Sidebar (narrow) + Chat Area (wide) ==========
+    sidebar_col, chat_col = st.columns([1, 4])
     
-    # ============ MESSAGE ACTIONS (ChatGPT-like) ============
-    if st.session_state.chat_history and len(st.session_state.chat_history) >= 2:
-        last_ai_msg = None
-        for msg in reversed(st.session_state.chat_history):
-            if msg["role"] == "assistant":
-                last_ai_msg = msg["content"]
-                break
+    # ========== LEFT SIDEBAR - Controls ==========
+    with sidebar_col:
+        # Header
+        st.markdown("""
+        <div style="text-align:center;padding:8px 0 12px">
+            <div style="font-size:28px;margin-bottom:4px">🤖</div>
+            <div style="font-size:10px;color:#00f5ff;font-weight:600;letter-spacing:1px">AI ASSISTANT</div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if last_ai_msg:
-            st.markdown('<div style="font-size:8px;color:#4a6380;margin:6px 0 4px;letter-spacing:1px">MESSAGE ACTIONS</div>', unsafe_allow_html=True)
-            act_col1, act_col2, act_col3, act_col4 = st.columns(4)
-            
-            # Copy Button
-            with act_col1:
-                if st.button("📋 Copy", key="copy_resp", use_container_width=True, help="Copy response to clipboard"):
-                    st.session_state.copied_text = last_ai_msg
-                    st.toast("✅ Copied to clipboard!")
-            
-            # Run Code Button
-            with act_col2:
-                code_blocks = extract_code_blocks(last_ai_msg)
-                if code_blocks:
-                    if st.button("▶️ Run", key="run_code", use_container_width=True, help="Execute Python code"):
-                        # Run the first code block
-                        result = run_python_code_safe(code_blocks[0])
-                        st.session_state.code_output = result
-                        st.session_state.reopen_chat = True
-                        st.rerun()
-                else:
-                    st.button("▶️ Run", key="run_code_disabled", use_container_width=True, disabled=True, help="No code to run")
-            
-            # Regenerate Button
-            with act_col3:
-                if st.button("🔄 Regen", key="regenerate", use_container_width=True, help="Generate new response"):
-                    if st.session_state.last_user_msg:
-                        # Remove last AI response
-                        if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "assistant":
-                            st.session_state.chat_history.pop()
-                        # Remove last user message too (will be re-added)
-                        if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
-                            st.session_state.chat_history.pop()
-                        st.session_state.pending_chat_msg = st.session_state.last_user_msg
-                        st.session_state.reopen_chat = True
-                        st.rerun()
-            
-            # Thumbs feedback
-            with act_col4:
-                fb_c1, fb_c2 = st.columns(2)
-                with fb_c1:
-                    if st.button("👍", key="thumbs_up", use_container_width=True):
-                        st.toast("Thanks for the feedback! 🎉")
-                with fb_c2:
-                    if st.button("👎", key="thumbs_down", use_container_width=True):
-                        st.toast("Got it, I'll try to improve! 🔧")
-            
-            # Show code output if exists
-            if st.session_state.code_output:
-                result = st.session_state.code_output
-                if result['success']:
-                    output_text = result['output'] if result['output'] else "(No output)"
-                    st.markdown(f'''
-                    <div style="background:#0a1a0f;border:1px solid rgba(0,255,136,0.3);border-radius:8px;padding:10px 12px;margin:8px 0">
-                        <div style="font-size:9px;color:#00ff88;margin-bottom:4px;letter-spacing:1px">✓ OUTPUT</div>
-                        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#e8f4f8;white-space:pre-wrap">{output_text}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'''
-                    <div style="background:#1a0a0a;border:1px solid rgba(255,100,100,0.3);border-radius:8px;padding:10px 12px;margin:8px 0">
-                        <div style="font-size:9px;color:#ff6b6b;margin-bottom:4px;letter-spacing:1px">✗ ERROR</div>
-                        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff9999;white-space:pre-wrap">{result['error']}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-    
-    # Follow-up suggestions
-    if st.session_state.chat_history:
-        last_resp = ""
-        for msg in reversed(st.session_state.chat_history):
-            if msg["role"] == "assistant":
-                last_resp = msg["content"]
-                break
-        if last_resp:
-            followups = get_followups(last_resp)
-            st.markdown('<div style="font-size:8px;color:#4a6380;margin:8px 0 4px;letter-spacing:1px">FOLLOW-UP</div>', unsafe_allow_html=True)
-            fu_cols = st.columns(3)
-            for i, fu in enumerate(followups):
-                with fu_cols[i]:
-                    if st.button(fu, key=f"fu_{i}", use_container_width=True):
-                        st.session_state.pending_chat_msg = fu
-                        st.session_state.reopen_chat = True
-                        st.rerun()
-    
-    # Topic category tabs with prompts
-    st.markdown('<div style="font-size:8px;color:#4a6380;margin:8px 0 4px;letter-spacing:1px">QUICK PROMPTS</div>', unsafe_allow_html=True)
-    
-    tab_python, tab_selenium, tab_robot, tab_help = st.tabs(["🐍 Python", "🌐 Selenium", "🤖 Robot", "💡 Help"])
-    
-    with tab_python:
-        cols = st.columns(3)
-        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Python"]):
-            with cols[i]:
-                if st.button(f"{icon} {prompt}", key=f"py_{i}", use_container_width=True):
-                    st.session_state.pending_chat_msg = prompt
-                    st.session_state.reopen_chat = True
-                    st.rerun()
-    
-    with tab_selenium:
-        cols = st.columns(3)
-        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Selenium"]):
-            with cols[i]:
-                if st.button(f"{icon} {prompt}", key=f"sel_{i}", use_container_width=True):
-                    st.session_state.pending_chat_msg = prompt
-                    st.session_state.reopen_chat = True
-                    st.rerun()
-    
-    with tab_robot:
-        cols = st.columns(3)
-        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Robot"]):
-            with cols[i]:
-                if st.button(f"{icon} {prompt}", key=f"rob_{i}", use_container_width=True):
-                    st.session_state.pending_chat_msg = prompt
-                    st.session_state.reopen_chat = True
-                    st.rerun()
-    
-    with tab_help:
-        cols = st.columns(3)
-        for i, (prompt, icon) in enumerate(CHAT_PROMPTS["Help"]):
-            with cols[i]:
-                if st.button(f"{icon} {prompt}", key=f"help_{i}", use_container_width=True):
-                    st.session_state.pending_chat_msg = prompt
-                    st.session_state.reopen_chat = True
-                    st.rerun()
-    
-    # Input form
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-    with st.form(key="chat_form", clear_on_submit=True):
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            user_msg = st.text_input("Ask a question", placeholder="Ask anything or paste code to run...", key="modal_chat_input", label_visibility="collapsed")
-        with col2:
-            send_btn = st.form_submit_button("Send", type="primary", use_container_width=True)
-        
-        if send_btn and user_msg:
-            st.session_state.pending_chat_msg = user_msg
+        # Response Mode Toggle
+        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">RESPONSE MODE</div>', unsafe_allow_html=True)
+        mode_options = ["📝 Detailed", "⚡ Concise"]
+        current_mode = 0 if st.session_state.response_mode == "detailed" else 1
+        selected_mode = st.radio("Mode", mode_options, index=current_mode, key="mode_radio", label_visibility="collapsed")
+        new_mode = "detailed" if "Detailed" in selected_mode else "concise"
+        if new_mode != st.session_state.response_mode:
+            st.session_state.response_mode = new_mode
             st.session_state.reopen_chat = True
             st.rerun()
-    
-    # Bottom actions
-    bottom_cols = st.columns([1, 1, 1])
-    with bottom_cols[0]:
-        if st.button("🗑️ Clear", use_container_width=True):
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Quick Prompts Section
+        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">QUICK PROMPTS</div>', unsafe_allow_html=True)
+        
+        prompt_category = st.selectbox("Category", ["🐍 Python", "🌐 Selenium", "🤖 Robot", "💡 Help", "🖥️ Linux", "🌐 Network"], 
+                                       key="prompt_cat", label_visibility="collapsed")
+        
+        category_map = {"🐍 Python": "Python", "🌐 Selenium": "Selenium", "🤖 Robot": "Robot", "💡 Help": "Help",
+                        "🖥️ Linux": "Linux", "🌐 Network": "Network"}
+        cat_key = category_map.get(prompt_category, "Python")
+        
+        # Add Linux and Network prompts
+        extended_prompts = {
+            **CHAT_PROMPTS,
+            "Linux": [("What is Linux?", "🐧"), ("Explain systemd", "⚡"), ("Bash scripting", "📜")],
+            "Network": [("What is TCP/IP?", "🌐"), ("Explain DNS", "📡"), ("What is HTTP?", "🔗")]
+        }
+        
+        if cat_key in extended_prompts:
+            for prompt, icon in extended_prompts[cat_key]:
+                if st.button(f"{icon} {prompt}", key=f"sb_{cat_key}_{prompt[:10]}", use_container_width=True):
+                    st.session_state.pending_chat_msg = prompt
+                    st.session_state.reopen_chat = True
+                    st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Actions Section
+        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">ACTIONS</div>', unsafe_allow_html=True)
+        
+        if st.button("🗑️ Clear Chat", key="clear_chat_sb", use_container_width=True):
             st.session_state.chat_history = []
             st.session_state.code_output = None
             st.session_state.reopen_chat = True
             st.rerun()
-    with bottom_cols[1]:
-        if st.button("📄 Explain Code", use_container_width=True):
+        
+        if st.button("📄 Explain My Code", key="explain_code_sb", use_container_width=True):
             code = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "# No code yet")
-            st.session_state.pending_chat_msg = f"Explain this code:\n```python\n{code[:300]}\n```"
+            st.session_state.pending_chat_msg = f"Explain this code:\n```python\n{code[:500]}\n```"
             st.session_state.reopen_chat = True
             st.rerun()
-    with bottom_cols[2]:
-        mode_icon = "⚡" if st.session_state.response_mode == "concise" else "📝"
-        mode_text = "Concise" if st.session_state.response_mode == "concise" else "Detailed"
-        st.markdown(f'<div style="text-align:center;padding:8px;font-size:10px;color:#6b8068">{mode_icon} {mode_text} Mode</div>', unsafe_allow_html=True)
+        
+        # Message Actions (if there's a conversation)
+        if st.session_state.chat_history and len(st.session_state.chat_history) >= 2:
+            last_ai_msg = None
+            for msg in reversed(st.session_state.chat_history):
+                if msg["role"] == "assistant":
+                    last_ai_msg = msg["content"]
+                    break
+            
+            if last_ai_msg:
+                st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+                st.markdown('<div class="sidebar-label">MESSAGE</div>', unsafe_allow_html=True)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("📋", key="copy_sb", use_container_width=True, help="Copy"):
+                        st.session_state.copied_text = last_ai_msg
+                        st.toast("✅ Copied!")
+                with c2:
+                    if st.button("🔄", key="regen_sb", use_container_width=True, help="Regenerate"):
+                        if st.session_state.last_user_msg:
+                            if st.session_state.chat_history[-1]["role"] == "assistant":
+                                st.session_state.chat_history.pop()
+                            if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+                                st.session_state.chat_history.pop()
+                            st.session_state.pending_chat_msg = st.session_state.last_user_msg
+                            st.session_state.reopen_chat = True
+                            st.rerun()
+                
+                # Run code if available
+                code_blocks = extract_code_blocks(last_ai_msg)
+                if code_blocks:
+                    if st.button("▶️ Run Code", key="run_sb", use_container_width=True):
+                        result = run_python_code_safe(code_blocks[0])
+                        st.session_state.code_output = result
+                        st.session_state.reopen_chat = True
+                        st.rerun()
+                
+                # Feedback
+                fb1, fb2 = st.columns(2)
+                with fb1:
+                    if st.button("👍", key="up_sb", use_container_width=True):
+                        st.toast("Thanks! 🎉")
+                with fb2:
+                    if st.button("👎", key="down_sb", use_container_width=True):
+                        st.toast("Noted! 🔧")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # ========== RIGHT SIDE - Main Chat Area ==========
+    with chat_col:
+        # Chat Header
+        st.markdown("""
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,245,255,0.2);margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(0,245,255,0.2),rgba(191,0,255,0.1));border:2px solid rgba(0,245,255,0.4);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#00f5ff">&lt;/&gt;</div>
+                <div>
+                    <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:#fff">CHAT</div>
+                    <div style="font-size:10px;color:#8fa3b8">Python • Selenium • Robot • Linux • Network</div>
+                </div>
+            </div>
+            <div style="font-size:10px;color:#00ff88;padding:4px 10px;background:rgba(0,255,136,0.1);border-radius:12px;border:1px solid rgba(0,255,136,0.3)">
+                """ + ("⚡ Concise" if st.session_state.response_mode == "concise" else "📝 Detailed") + """
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # ========== LARGE CHAT CONTAINER ==========
+        chat_container = st.container(height=520)
+        with chat_container:
+            if not st.session_state.chat_history:
+                st.markdown("""
+                <div style="text-align:center;padding:80px 40px">
+                    <div style="font-size:60px;margin-bottom:16px;text-shadow:0 0 40px rgba(0,245,255,0.5)">🤖</div>
+                    <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:600;color:#fff;margin-bottom:8px">START A CONVERSATION</div>
+                    <div style="color:#8fa3b8;font-size:13px;line-height:1.6;max-width:400px;margin:0 auto">
+                        Ask me about Python, Selenium, Robot Framework, Linux, Networking, or any coding concept!
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                for idx, m in enumerate(st.session_state.chat_history[-15:]):
+                    if m["role"] == "user":
+                        st.markdown(f'''
+                        <div class="chat-msg-user">
+                            <div style="font-size:9px;font-weight:600;opacity:0.7;margin-bottom:4px;letter-spacing:1px">YOU</div>
+                            {m["content"][:600]}{"..." if len(m["content"]) > 600 else ""}
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    else:
+                        formatted = format_response_html(m["content"])
+                        st.markdown(f'''
+                        <div class="chat-msg-ai">
+                            <div style="font-size:9px;font-weight:600;color:#00f5ff;margin-bottom:6px;letter-spacing:1px">AI ASSISTANT</div>
+                            <div style="color:#e8f4f8">{formatted}</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                
+                # Typing indicator
+                if st.session_state.get("chat_loading"):
+                    st.markdown('''
+                    <div class="chat-msg-ai" style="display:inline-block">
+                        <div style="font-size:9px;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
+                        <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+                    </div>
+                    ''', unsafe_allow_html=True)
+        
+        # Show code output if exists
+        if st.session_state.code_output:
+            result = st.session_state.code_output
+            if result['success']:
+                output_text = result['output'] if result['output'] else "(No output)"
+                st.markdown(f'''
+                <div style="background:#0a1a0f;border:1px solid rgba(0,255,136,0.4);border-radius:10px;padding:12px 16px;margin:8px 0">
+                    <div style="font-size:10px;color:#00ff88;margin-bottom:6px;letter-spacing:1px;font-weight:600">✓ CODE OUTPUT</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8f4f8;white-space:pre-wrap">{output_text}</div>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                st.markdown(f'''
+                <div style="background:#1a0a0a;border:1px solid rgba(255,100,100,0.4);border-radius:10px;padding:12px 16px;margin:8px 0">
+                    <div style="font-size:10px;color:#ff6b6b;margin-bottom:6px;letter-spacing:1px;font-weight:600">✗ ERROR</div>
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#ff9999;white-space:pre-wrap">{result['error']}</div>
+                </div>
+                ''', unsafe_allow_html=True)
+        
+        # Follow-up suggestions (inline with chat)
+        if st.session_state.chat_history:
+            last_resp = ""
+            for msg in reversed(st.session_state.chat_history):
+                if msg["role"] == "assistant":
+                    last_resp = msg["content"]
+                    break
+            if last_resp:
+                followups = get_followups(last_resp)
+                fu_cols = st.columns(3)
+                for i, fu in enumerate(followups):
+                    with fu_cols[i]:
+                        if st.button(fu, key=f"fu_main_{i}", use_container_width=True):
+                            st.session_state.pending_chat_msg = fu
+                            st.session_state.reopen_chat = True
+                            st.rerun()
+        
+        # Input form at bottom
+        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
+        with st.form(key="chat_form_new", clear_on_submit=True):
+            input_col, send_col = st.columns([6, 1])
+            with input_col:
+                user_msg = st.text_input("Message", placeholder="Ask anything about Python, Linux, Networking...", 
+                                         key="chat_input_main", label_visibility="collapsed")
+            with send_col:
+                send_btn = st.form_submit_button("Send", type="primary", use_container_width=True)
+            
+            if send_btn and user_msg:
+                st.session_state.pending_chat_msg = user_msg
+                st.session_state.reopen_chat = True
+                st.rerun()
 
 
 # ==================== HEADER ====================

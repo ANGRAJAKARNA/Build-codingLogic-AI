@@ -193,6 +193,57 @@ except ImportError:
     AUTOMATION_TAGS = []
 
 
+# =============================================================================
+# ADVANCED CONCEPTS INTEGRATION (Modern Python 3.7+ Features)
+# =============================================================================
+
+ADVANCED_CONCEPTS_AVAILABLE = False
+
+try:
+    from advanced_concepts import (
+        ADVANCED_CONCEPTS,
+        ADVANCED_TAGS
+    )
+    ADVANCED_CONCEPTS_AVAILABLE = True
+except ImportError:
+    ADVANCED_CONCEPTS = {}
+    ADVANCED_TAGS = []
+
+
+# =============================================================================
+# INFRASTRUCTURE CONCEPTS INTEGRATION (Networking, Servers, Storage)
+# =============================================================================
+
+INFRASTRUCTURE_CONCEPTS_AVAILABLE = False
+
+try:
+    from infrastructure_concepts import (
+        INFRASTRUCTURE_CONCEPTS,
+        INFRASTRUCTURE_TAGS
+    )
+    INFRASTRUCTURE_CONCEPTS_AVAILABLE = True
+except ImportError:
+    INFRASTRUCTURE_CONCEPTS = {}
+    INFRASTRUCTURE_TAGS = []
+
+
+# =============================================================================
+# LINUX CONCEPTS INTEGRATION
+# =============================================================================
+
+LINUX_CONCEPTS_AVAILABLE = False
+
+try:
+    from linux_concepts import (
+        LINUX_CONCEPTS,
+        LINUX_TAGS
+    )
+    LINUX_CONCEPTS_AVAILABLE = True
+except ImportError:
+    LINUX_CONCEPTS = {}
+    LINUX_TAGS = []
+
+
 def _match_automation_concept(topic: str, topic_words: List[str]) -> Optional[str]:
     """
     Match user query against automation concepts (Selenium, Robot Framework, etc.)
@@ -3452,6 +3503,101 @@ for shape in shapes:
 | `__str__` | `str()` | `print(a)` |
 | `__iter__` | `for` | `for x in a` |""",
 
+    "overloading": """## 🔄 Overloading in Python
+
+**Definition:** Overloading allows using the same function/operator name with different implementations based on arguments or types.
+
+### 1. Method Overloading (via Default Arguments)
+Python doesn't support traditional method overloading. Instead, use default arguments:
+```python
+class Calculator:
+    def add(self, a, b=0, c=0):
+        return a + b + c
+
+calc = Calculator()
+calc.add(5)       # 5 (one argument)
+calc.add(5, 3)    # 8 (two arguments)
+calc.add(5, 3, 2) # 10 (three arguments)
+```
+
+### 2. Method Overloading (via *args)
+```python
+class Math:
+    def add(self, *args):
+        return sum(args)
+
+m = Math()
+m.add(1, 2)          # 3
+m.add(1, 2, 3, 4)    # 10
+```
+
+### 3. Operator Overloading (Magic Methods)
+```python
+class Vector:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+    
+    def __add__(self, other):      # +
+        return Vector(self.x + other.x, self.y + other.y)
+    
+    def __sub__(self, other):      # -
+        return Vector(self.x - other.x, self.y - other.y)
+    
+    def __mul__(self, scalar):     # *
+        return Vector(self.x * scalar, self.y * scalar)
+    
+    def __eq__(self, other):       # ==
+        return self.x == other.x and self.y == other.y
+    
+    def __str__(self):
+        return f"Vector({self.x}, {self.y})"
+
+v1, v2 = Vector(2, 3), Vector(4, 5)
+print(v1 + v2)  # Vector(6, 8)
+print(v1 * 3)   # Vector(6, 9)
+```
+
+### 4. Using @singledispatch (functools)
+```python
+from functools import singledispatch
+
+@singledispatch
+def process(data):
+    return f"Unknown type: {type(data)}"
+
+@process.register(int)
+def _(data):
+    return f"Integer: {data * 2}"
+
+@process.register(str)
+def _(data):
+    return f"String: {data.upper()}"
+
+@process.register(list)
+def _(data):
+    return f"List with {len(data)} items"
+
+print(process(5))         # Integer: 10
+print(process("hello"))   # String: HELLO
+print(process([1,2,3]))   # List with 3 items
+```
+
+### Common Operators to Overload
+| Method | Operator | Example |
+|--------|----------|---------|
+| `__add__` | `+` | `a + b` |
+| `__sub__` | `-` | `a - b` |
+| `__mul__` | `*` | `a * b` |
+| `__truediv__` | `/` | `a / b` |
+| `__eq__` | `==` | `a == b` |
+| `__lt__` | `<` | `a < b` |
+| `__le__` | `<=` | `a <= b` |
+| `__len__` | `len()` | `len(a)` |
+| `__getitem__` | `[]` | `a[i]` |
+| `__call__` | `()` | `a()` |
+
+**Key Point:** Python favors duck typing over strict overloading - "If it walks like a duck and quacks like a duck, it's a duck." """,
+
     "abstraction": """## 🎭 Abstraction in Python
 
 **Definition:** Abstraction is the process of hiding complex implementation details and showing only the necessary features of an object.
@@ -5923,6 +6069,34 @@ def _find_concept_answer(topic: str) -> Optional[str]:
         if auto_answer:
             return auto_answer
     
+    # Check advanced concepts (async, dataclass, pathlib, etc.)
+    if ADVANCED_CONCEPTS_AVAILABLE:
+        for concept_key in ADVANCED_CONCEPTS.keys():
+            if concept_key in topic_lower or topic_lower in concept_key:
+                return ADVANCED_CONCEPTS[concept_key]
+            # Also check for word matches
+            for tw in topic_words:
+                if concept_key == tw or concept_key in tw or tw in concept_key:
+                    return ADVANCED_CONCEPTS[concept_key]
+    
+    # Check infrastructure concepts (networking, servers, storage)
+    if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
+        for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
+            if concept_key in topic_lower or topic_lower in concept_key:
+                return INFRASTRUCTURE_CONCEPTS[concept_key]
+            for tw in topic_words:
+                if concept_key == tw or concept_key in tw or tw in concept_key:
+                    return INFRASTRUCTURE_CONCEPTS[concept_key]
+    
+    # Check Linux concepts
+    if LINUX_CONCEPTS_AVAILABLE:
+        for concept_key in LINUX_CONCEPTS.keys():
+            if concept_key in topic_lower or topic_lower in concept_key:
+                return LINUX_CONCEPTS[concept_key]
+            for tw in topic_words:
+                if concept_key == tw or concept_key in tw or tw in concept_key:
+                    return LINUX_CONCEPTS[concept_key]
+    
     # Fallback: Find best matching concept from CONCEPTS
     best_match = None
     best_score = 0
@@ -5959,6 +6133,16 @@ def _handle_multiple_topics(user_message: str) -> Optional[str]:
     Returns combined answers or None if not a multi-topic query.
     """
     msg_lower = user_message.lower()
+    
+    # Skip if message contains context markers (indicates concatenated message from UI)
+    context_markers = ["previous conversation:", "current question:", "be concise", 
+                       "bullet points", "keep under", "assistant:", "user:"]
+    if any(marker in msg_lower for marker in context_markers):
+        return None
+    
+    # Skip very long messages (likely contain context/conversation history)
+    if len(user_message) > 300:
+        return None
     
     # Check if this looks like multiple topics
     # Patterns: "explain X, Y, Z" or "what is X and Y" or "X, Y, Z"
@@ -6380,7 +6564,34 @@ def generate_response(
                 return True
             return False
         
-        # Find the best matching concept
+        # CHECK SPECIALIZED CONCEPTS FIRST (before general Python concepts)
+        # This ensures "dataclass" matches before "class", "asyncio" before generic matches, etc.
+        
+        # Try advanced concepts FIRST (async, dataclass, pathlib, etc.)
+        if ADVANCED_CONCEPTS_AVAILABLE:
+            for concept_key in ADVANCED_CONCEPTS.keys():
+                if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
+                    return ADVANCED_CONCEPTS[concept_key]
+        
+        # Try automation concepts (Selenium, Robot Framework, pytest)
+        if AUTOMATION_CONCEPTS_AVAILABLE:
+            auto_match = _match_automation_concept(topic, topic_words)
+            if auto_match:
+                return auto_match
+        
+        # Try infrastructure concepts (networking, servers, storage, tcp, etc.)
+        if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
+            for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
+                if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
+                    return INFRASTRUCTURE_CONCEPTS[concept_key]
+        
+        # Try Linux concepts (systemd, bash, etc.)
+        if LINUX_CONCEPTS_AVAILABLE:
+            for concept_key in LINUX_CONCEPTS.keys():
+                if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
+                    return LINUX_CONCEPTS[concept_key]
+        
+        # Find the best matching concept from general Python CONCEPTS
         best_match = None
         best_score = 0
         
@@ -6413,12 +6624,6 @@ def generate_response(
         
         if best_match and best_score > 0:
             return CONCEPTS[best_match]
-        
-        # Try automation concepts (Selenium, Robot Framework, pytest)
-        if AUTOMATION_CONCEPTS_AVAILABLE:
-            auto_match = _match_automation_concept(topic, topic_words)
-            if auto_match:
-                return auto_match
         
         # If no manual match, try PDF knowledge base
         if PDF_KB_AVAILABLE:
@@ -6541,6 +6746,91 @@ What would you like to know?"""
         for concept_key in CONCEPTS.keys():
             if concept_key in msg_lower:
                 return CONCEPTS[concept_key]
+        
+        # Try advanced concepts (async, dataclass, pathlib, etc.)
+        if ADVANCED_CONCEPTS_AVAILABLE:
+            for concept_key in ADVANCED_CONCEPTS.keys():
+                if concept_key in msg_lower:
+                    return ADVANCED_CONCEPTS[concept_key]
+        
+        # Try infrastructure concepts (networking, servers, storage)
+        if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
+            for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
+                if concept_key in msg_lower:
+                    return INFRASTRUCTURE_CONCEPTS[concept_key]
+        
+        # Try Linux concepts
+        if LINUX_CONCEPTS_AVAILABLE:
+            for concept_key in LINUX_CONCEPTS.keys():
+                if concept_key in msg_lower:
+                    return LINUX_CONCEPTS[concept_key]
+    
+    # Direct concept lookup for single-word queries
+    msg_single = msg_lower.strip()
+    if ' ' not in msg_single:
+        if ADVANCED_CONCEPTS_AVAILABLE and msg_single in ADVANCED_CONCEPTS:
+            return ADVANCED_CONCEPTS[msg_single]
+        if LINUX_CONCEPTS_AVAILABLE and msg_single in LINUX_CONCEPTS:
+            return LINUX_CONCEPTS[msg_single]
+        if INFRASTRUCTURE_CONCEPTS_AVAILABLE and msg_single in INFRASTRUCTURE_CONCEPTS:
+            return INFRASTRUCTURE_CONCEPTS[msg_single]
+    
+    # Final fallback: Direct concept lookup for multi-word queries
+    msg_clean = msg_lower.strip()
+    if msg_clean in CONCEPTS:
+        return CONCEPTS[msg_clean]
+    if ADVANCED_CONCEPTS_AVAILABLE and msg_clean in ADVANCED_CONCEPTS:
+        return ADVANCED_CONCEPTS[msg_clean]
+    if LINUX_CONCEPTS_AVAILABLE and msg_clean in LINUX_CONCEPTS:
+        return LINUX_CONCEPTS[msg_clean]
+    if INFRASTRUCTURE_CONCEPTS_AVAILABLE and msg_clean in INFRASTRUCTURE_CONCEPTS:
+        return INFRASTRUCTURE_CONCEPTS[msg_clean]
+    
+    # Final fallback: Check for meaningful matches in all concept keys
+    # Filter out common/stop words that cause false matches (e.g., 'is' in 'list')
+    stop_words = {'what', 'is', 'are', 'a', 'an', 'the', 'how', 'do', 'does', 'can', 'i', 
+                  'to', 'in', 'on', 'of', 'for', 'me', 'my', 'about', 'tell', 'explain', 
+                  'show', 'give', 'please', 'help', 'with', 'this', 'that', 'it', 'be'}
+    meaningful_words = [w for w in msg_clean.split() if w not in stop_words and len(w) > 2]
+    
+    # Helper function for safe concept matching
+    def matches_concept(concept_key, words, message):
+        # Exact key match in message
+        if concept_key in message.split():
+            return True
+        # Word matches concept key exactly or is significant substring
+        for w in words:
+            if w == concept_key:  # Exact word match
+                return True
+            # Only allow substring matches for words >= 4 chars to avoid 'is' in 'list'
+            if len(w) >= 4 and (w in concept_key or concept_key in w):
+                return True
+        return False
+    
+    # Check Python CONCEPTS
+    for concept_key in CONCEPTS.keys():
+        if matches_concept(concept_key, meaningful_words, msg_clean):
+            return CONCEPTS[concept_key]
+    # Check Advanced
+    if ADVANCED_CONCEPTS_AVAILABLE:
+        for concept_key in ADVANCED_CONCEPTS.keys():
+            if matches_concept(concept_key, meaningful_words, msg_clean):
+                return ADVANCED_CONCEPTS[concept_key]
+    # Check Automation
+    if AUTOMATION_CONCEPTS_AVAILABLE:
+        auto_match = _match_automation_concept(msg_clean, meaningful_words)
+        if auto_match:
+            return auto_match
+    # Check Infrastructure
+    if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
+        for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
+            if matches_concept(concept_key, meaningful_words, msg_clean):
+                return INFRASTRUCTURE_CONCEPTS[concept_key]
+    # Check Linux
+    if LINUX_CONCEPTS_AVAILABLE:
+        for concept_key in LINUX_CONCEPTS.keys():
+            if matches_concept(concept_key, meaningful_words, msg_clean):
+                return LINUX_CONCEPTS[concept_key]
     
     # Default helpful response (only if nothing else worked)
     return generate_default_response(question, function_name, user_code, user_message)
