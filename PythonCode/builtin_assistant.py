@@ -15,6 +15,188 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 # =============================================================================
+# SELF-LEARNING MODULE INTEGRATION
+# =============================================================================
+
+LEARNING_AVAILABLE = False
+_learning_memory = None
+_feedback_learner = None
+
+_smart_matcher = None
+
+def _init_learning_modules():
+    """Initialize learning modules if available."""
+    global LEARNING_AVAILABLE, _learning_memory, _feedback_learner, _smart_matcher
+    if _learning_memory is not None:
+        return True
+    try:
+        from learning_memory import get_memory, get_feedback_learner, detect_topic, SmartMatcher
+        _learning_memory = get_memory()
+        _feedback_learner = get_feedback_learner()
+        _smart_matcher = SmartMatcher
+        LEARNING_AVAILABLE = True
+        return True
+    except ImportError:
+        LEARNING_AVAILABLE = False
+        return False
+
+def get_smart_matcher():
+    """Get the SmartMatcher class for spell correction."""
+    _init_learning_modules()
+    return _smart_matcher
+
+def get_learning_memory():
+    """Get the conversation memory instance."""
+    _init_learning_modules()
+    return _learning_memory
+
+def get_feedback_learner_instance():
+    """Get the feedback learner instance."""
+    _init_learning_modules()
+    return _feedback_learner
+
+def store_qa_interaction(question: str, answer: str, topic: str = None):
+    """Store a Q&A interaction for learning."""
+    if not _init_learning_modules():
+        return
+    try:
+        from learning_memory import detect_topic
+        topic = topic or detect_topic(question)
+        _learning_memory.store_qa(question, answer, topic)
+    except Exception:
+        pass
+
+def record_feedback(question: str, answer: str, is_positive: bool, correction: str = None):
+    """Record user feedback on a response with advanced learning."""
+    if not _init_learning_modules():
+        return
+    try:
+        from learning_memory import update_learning_from_feedback
+        # Use the advanced feedback function that also updates user profile
+        update_learning_from_feedback(question, answer, is_positive, correction)
+    except ImportError:
+        # Fallback to basic feedback recording
+        try:
+            from learning_memory import detect_topic
+            topic = detect_topic(question)
+            _feedback_learner.record_feedback(topic, question, answer, is_positive, correction)
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+def _check_learned_response(user_message: str) -> Optional[Dict]:
+    """
+    Check if we have a learned response for this question.
+    Uses advanced matching including corrections.
+    
+    Returns:
+        Dict with 'answer', 'confidence', 'source' or None
+    """
+    if not _init_learning_modules():
+        return None
+    
+    try:
+        from learning_memory import get_smart_response, detect_topic
+        
+        # Use the new smart response system
+        learned = get_smart_response(user_message)
+        
+        if learned:
+            return learned
+        
+        # Fallback to simple check for older data format
+        topic = detect_topic(user_message)
+        if topic:
+            similar = _feedback_learner.find_similar_question(user_message, topic)
+            if similar and similar.get("score", 0) >= 3:
+                return {
+                    "answer": similar.get("a"),
+                    "confidence": similar.get("_confidence", {"score": 0.7, "icon": "🟢", "level": "high"}),
+                    "source": "learned"
+                }
+        
+    except Exception:
+        pass
+    
+    return None
+
+
+def _format_learned_response(learned: Dict) -> str:
+    """Format a learned response with confidence indicator."""
+    answer = learned.get("answer", "")
+    confidence = learned.get("confidence", {})
+    source = learned.get("source", "learned")
+    
+    # Get confidence icon
+    icon = confidence.get("icon", "🟢")
+    level = confidence.get("level", "high")
+    score = confidence.get("score", 0.7)
+    
+    # Add a subtle indicator for learned responses
+    if source == "correction":
+        header = f"📝 *From your correction* {icon}\n\n"
+    elif score >= 0.8:
+        header = f"⭐ *Learned response* {icon}\n\n"
+    else:
+        header = ""
+    
+    return header + answer
+
+
+def get_response_with_learning(user_message: str, *args, **kwargs) -> Tuple[str, Optional[Dict]]:
+    """
+    Get a response, checking learned responses first.
+    
+    Returns:
+        Tuple of (response_text, learning_info)
+        learning_info is None if response was generated, or Dict with confidence if learned
+    """
+    # Check for learned response first
+    learned = _check_learned_response(user_message)
+    
+    if learned and learned.get("answer"):
+        formatted = _format_learned_response(learned)
+        return (formatted, learned)
+    
+    # No learned response, generate normally
+    # (The generate_response function will be called separately)
+    return (None, None)
+
+def get_learning_stats() -> Dict:
+    """Get combined learning statistics."""
+    if not _init_learning_modules():
+        return {"available": False}
+    
+    try:
+        mem_stats = _learning_memory.get_stats()
+        fb_stats = _feedback_learner.get_stats()
+        user_profile = mem_stats.get("user_profile", {})
+        
+        # Check if semantic search is available
+        semantic_available = False
+        try:
+            from learning_memory import SmartMatcher
+            semantic_available = SmartMatcher.is_semantic_available()
+        except Exception:
+            pass
+        
+        return {
+            "available": True,
+            "total_interactions": mem_stats.get("total_qa", 0),
+            "feedback_count": fb_stats.get("total_feedback", 0),
+            "satisfaction_rate": fb_stats.get("satisfaction_rate", 0),
+            "top_topics": mem_stats.get("top_topics", []),
+            "corrections_count": fb_stats.get("corrections_count", 0),
+            "skill_level": user_profile.get("skill_level", "unknown"),
+            "interests": user_profile.get("interests", []),
+            "topics_mastered": user_profile.get("topics_mastered", []),
+            "semantic_search": semantic_available
+        }
+    except Exception:
+        return {"available": False}
+
+# =============================================================================
 # GROQ API INTEGRATION (Optional - Enhances responses when available)
 # =============================================================================
 
@@ -6458,10 +6640,43 @@ def generate_response(
     """Generate a comprehensive, helpful response based on user input."""
     
     msg_lower = user_message.lower().strip()
+    spelling_notice = ""  # Will hold any spelling correction notice
+    
+    # ==========================================================================
+    # SPELLING CORRECTION: Check and fix typos in the query
+    # ==========================================================================
+    SmartMatcher = get_smart_matcher()
+    if SmartMatcher:
+        corrections = SmartMatcher.get_spelling_corrections(user_message)
+        if corrections:
+            # Build a notice about what was corrected
+            correction_pairs = [f"'{wrong}' → '{right}'" for wrong, right in corrections.items()]
+            spelling_notice = f"🔤 **Auto-corrected:** {', '.join(correction_pairs)}\n\n"
+            
+            # Update the message with corrections for processing
+            corrected_message = user_message
+            for wrong, right in corrections.items():
+                # Case-insensitive replacement
+                corrected_message = re.sub(
+                    re.escape(wrong),
+                    right,
+                    corrected_message,
+                    flags=re.IGNORECASE
+                )
+            user_message = corrected_message
+            msg_lower = user_message.lower().strip()
     
     # Interview mode - act like a technical interviewer
     if interview_mode:
         return generate_interview_response(user_message, question, function_name, user_code)
+    
+    # ==========================================================================
+    # SELF-LEARNING: Check for learned responses (corrections + rated)
+    # ==========================================================================
+    learned_response = _check_learned_response(user_message)
+    if learned_response and learned_response.get("answer"):
+        # We have a learned response - format it with confidence indicator
+        return spelling_notice + _format_learned_response(learned_response)
     
     # ==========================================================================
     # CODE EXPLANATION REQUEST - Handle "explain this code" requests
@@ -6496,18 +6711,21 @@ def generate_response(
     
     for concept_name in direct_concept_names:
         if clean_msg == concept_name or clean_msg == f"about {concept_name}":
-            # Direct automation concept match
+            # PRIORITY: Check Python concepts FIRST for core Python terms
+            # This ensures "class" returns Python class, not Selenium ActionChains
+            if concept_name in CONCEPTS:
+                return spelling_notice + CONCEPTS[concept_name]
+            
+            # Then try automation concept match (for selenium, robot, etc.)
             if AUTOMATION_CONCEPTS_AVAILABLE:
                 auto_match = _match_automation_concept(concept_name, concept_name.split())
                 if auto_match:
-                    return auto_match
-            # Check Python concepts
-            if concept_name in CONCEPTS:
-                return CONCEPTS[concept_name]
+                    return spelling_notice + auto_match
+            
             # Try partial match in CONCEPTS
             for key in CONCEPTS:
                 if concept_name in key or key in concept_name:
-                    return CONCEPTS[key]
+                    return spelling_notice + CONCEPTS[key]
     
     # Check for multiple topics first (e.g., "explain loops, classes, functions")
     multi_topic_response = _handle_multiple_topics(user_message)
@@ -6527,7 +6745,7 @@ def generate_response(
         # Remove question markers first
         topic = topic.replace("?", "")
         # Remove concept keywords (whole words only)
-        import re
+        # (re already imported at module level)
         removal_keywords = concept_keywords + ["use"]  # Also remove common verbs
         for keyword in removal_keywords:
             topic = re.sub(r'\b' + re.escape(keyword) + r'\b', ' ', topic)
@@ -6548,7 +6766,7 @@ def generate_response(
         if is_automation_query and AUTOMATION_CONCEPTS_AVAILABLE:
             auto_match = _match_automation_concept(topic, topic_words)
             if auto_match:
-                return auto_match
+                return spelling_notice + auto_match
         
         # Helper function to check if words match (including plurals)
         def words_match(word1, word2):
@@ -6567,29 +6785,105 @@ def generate_response(
         # CHECK SPECIALIZED CONCEPTS FIRST (before general Python concepts)
         # This ensures "dataclass" matches before "class", "asyncio" before generic matches, etc.
         
-        # Try advanced concepts FIRST (async, dataclass, pathlib, etc.)
+        # =======================================================================
+        # PRIORITY 1: Check if query matches CORE PYTHON CONCEPTS first
+        # This ensures "class", "function", "list", etc. return Python content
+        # =======================================================================
+        core_python_concepts = {
+            'class', 'classes', 'function', 'functions', 'method', 'methods',
+            'list', 'lists', 'dict', 'dictionary', 'dictionaries', 'tuple', 'tuples',
+            'set', 'sets', 'string', 'strings', 'loop', 'loops', 'for', 'while',
+            'if', 'else', 'elif', 'exception', 'exceptions', 'decorator', 'decorators',
+            'generator', 'generators', 'lambda', 'comprehension', 'inheritance',
+            'polymorphism', 'encapsulation', 'abstraction', 'recursion', 'module',
+            'package', 'import', 'variable', 'variables', 'object', 'objects',
+            'oop', 'iterator', 'iterators'
+        }
+        
+        # Check if query is about core Python (not explicitly automation)
+        automation_indicators = {'selenium', 'webdriver', 'robot', 'pytest', 'fixture', 
+                                'locator', 'xpath', 'browser', 'actionchains', 'actions',
+                                'element', 'click', 'send_keys', 'find_element', 'driver'}
+        is_automation_query = any(ind in msg_lower for ind in automation_indicators)
+        
+        # If it's a core Python concept and NOT explicitly about automation, check Python first
+        topic_has_core_concept = any(cc in topic_words or cc in topic for cc in core_python_concepts)
+        
+        if topic_has_core_concept and not is_automation_query:
+            # Check Python CONCEPTS for exact matches first
+            for concept_key in CONCEPTS.keys():
+                # Exact word match
+                if concept_key in topic_words:
+                    return spelling_notice + CONCEPTS[concept_key]
+                # Handle plurals: "classes" -> "class"
+                singular = concept_key.rstrip('s') if concept_key.endswith('s') else concept_key
+                for tw in topic_words:
+                    tw_singular = tw.rstrip('s') if tw.endswith('s') else tw
+                    if concept_key == tw_singular or singular == tw or singular == tw_singular:
+                        return spelling_notice + CONCEPTS[concept_key]
+        
+        # =======================================================================
+        # PRIORITY 2: Advanced Python concepts (async, dataclass, pathlib)
+        # =======================================================================
         if ADVANCED_CONCEPTS_AVAILABLE:
             for concept_key in ADVANCED_CONCEPTS.keys():
                 if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
-                    return ADVANCED_CONCEPTS[concept_key]
+                    return spelling_notice + ADVANCED_CONCEPTS[concept_key]
         
-        # Try automation concepts (Selenium, Robot Framework, pytest)
-        if AUTOMATION_CONCEPTS_AVAILABLE:
+        # =======================================================================
+        # PRIORITY 3: Automation concepts ONLY if query has automation indicators
+        # =======================================================================
+        if AUTOMATION_CONCEPTS_AVAILABLE and is_automation_query:
             auto_match = _match_automation_concept(topic, topic_words)
             if auto_match:
-                return auto_match
+                return spelling_notice + auto_match
         
-        # Try infrastructure concepts (networking, servers, storage, tcp, etc.)
+        # =======================================================================
+        # PRIORITY 4: Infrastructure concepts (networking, servers, storage)
+        # =======================================================================
         if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
             for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
                 if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
-                    return INFRASTRUCTURE_CONCEPTS[concept_key]
+                    return spelling_notice + INFRASTRUCTURE_CONCEPTS[concept_key]
         
-        # Try Linux concepts (systemd, bash, etc.)
+        # =======================================================================
+        # PRIORITY 5: Linux concepts (systemd, bash, etc.)
+        # =======================================================================
         if LINUX_CONCEPTS_AVAILABLE:
+            # Concept aliases: map specific terms to their parent concepts
+            linux_concept_aliases = {
+                'chmod': 'linux_permissions', 'chown': 'linux_permissions', 'chgrp': 'linux_permissions',
+                'permissions': 'linux_permissions', 'umask': 'linux_permissions',
+                'boot': 'linux_boot', 'grub2': 'grub', 'bootloader': 'grub',
+                'kernel': 'linux_kernel', 'distro': 'linux_distro', 'distribution': 'linux_distro',
+                'packages': 'linux_packages', 'apt': 'linux_packages', 'yum': 'linux_packages', 'dnf': 'linux_packages',
+                'process': 'linux_processes', 'ps': 'linux_processes', 'top': 'linux_processes',
+                'firewall': 'linux_firewall', 'iptables': 'linux_firewall', 'ufw': 'linux_firewall',
+                'logs': 'linux_logs', 'journalctl': 'linux_logs', 'syslog': 'linux_logs',
+                'users': 'linux_users', 'groups': 'linux_users', 'useradd': 'linux_users',
+                'filesystem': 'linux_filesystem', 'fhs': 'linux_filesystem',
+                'network': 'linux_networking', 'networking': 'linux_networking',
+                'hardening': 'linux_hardening', 'security': 'linux_hardening',
+            }
+            
+            # Check for aliased terms first
+            for tw in topic_words:
+                if tw in linux_concept_aliases:
+                    alias_target = linux_concept_aliases[tw]
+                    if alias_target in LINUX_CONCEPTS:
+                        return spelling_notice + LINUX_CONCEPTS[alias_target]
+            
             for concept_key in LINUX_CONCEPTS.keys():
                 if concept_key in topic or any(concept_key == tw or concept_key in tw for tw in topic_words):
-                    return LINUX_CONCEPTS[concept_key]
+                    return spelling_notice + LINUX_CONCEPTS[concept_key]
+        
+        # =======================================================================
+        # PRIORITY 6: Automation concepts (fallback for non-explicit queries)
+        # =======================================================================
+        if AUTOMATION_CONCEPTS_AVAILABLE and not topic_has_core_concept:
+            auto_match = _match_automation_concept(topic, topic_words)
+            if auto_match:
+                return spelling_notice + auto_match
         
         # Find the best matching concept from general Python CONCEPTS
         best_match = None
@@ -6623,13 +6917,13 @@ def generate_response(
                 best_match = concept_key
         
         if best_match and best_score > 0:
-            return CONCEPTS[best_match]
+            return spelling_notice + CONCEPTS[best_match]
         
         # If no manual match, try PDF knowledge base
         if PDF_KB_AVAILABLE:
             pdf_answer = query_pdf_knowledge(user_message)
             if pdf_answer:
-                return pdf_answer
+                return spelling_notice + pdf_answer
     
     # General Python questions - try PDF knowledge base
     python_question_keywords = ["how to", "can you", "why does", "when should", "what's the difference"]
@@ -6638,13 +6932,13 @@ def generate_response(
         sorted_concepts = sorted(CONCEPTS.keys(), key=len, reverse=True)
         for concept_key in sorted_concepts:
             if concept_key in msg_lower.split() or concept_key in msg_lower:
-                return CONCEPTS[concept_key]
+                return spelling_notice + CONCEPTS[concept_key]
         
         # Then try PDF
         if PDF_KB_AVAILABLE:
             pdf_answer = query_pdf_knowledge(user_message)
             if pdf_answer:
-                return pdf_answer
+                return spelling_notice + pdf_answer
     
     # Check for "where" questions about Python usage
     if "where" in msg_lower and "python" in msg_lower:
@@ -6735,56 +7029,75 @@ What would you like to know?"""
             _ensure_pdf_kb_initialized()
             pdf_answer = query_pdf_knowledge(user_message)
             if pdf_answer:
-                return pdf_answer
+                return spelling_notice + pdf_answer
         
         # Try Groq AI for complex/unmatched questions (if available)
         groq_response = _try_groq_for_complex_query(user_message, question, function_name, user_code)
         if groq_response:
-            return groq_response
+            return spelling_notice + groq_response
         
         # Try to match any concept as a last resort
         for concept_key in CONCEPTS.keys():
             if concept_key in msg_lower:
-                return CONCEPTS[concept_key]
+                return spelling_notice + CONCEPTS[concept_key]
         
         # Try advanced concepts (async, dataclass, pathlib, etc.)
         if ADVANCED_CONCEPTS_AVAILABLE:
             for concept_key in ADVANCED_CONCEPTS.keys():
                 if concept_key in msg_lower:
-                    return ADVANCED_CONCEPTS[concept_key]
+                    return spelling_notice + ADVANCED_CONCEPTS[concept_key]
         
         # Try infrastructure concepts (networking, servers, storage)
         if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
             for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
                 if concept_key in msg_lower:
-                    return INFRASTRUCTURE_CONCEPTS[concept_key]
+                    return spelling_notice + INFRASTRUCTURE_CONCEPTS[concept_key]
         
         # Try Linux concepts
         if LINUX_CONCEPTS_AVAILABLE:
             for concept_key in LINUX_CONCEPTS.keys():
                 if concept_key in msg_lower:
-                    return LINUX_CONCEPTS[concept_key]
+                    return spelling_notice + LINUX_CONCEPTS[concept_key]
     
     # Direct concept lookup for single-word queries
     msg_single = msg_lower.strip()
     if ' ' not in msg_single:
         if ADVANCED_CONCEPTS_AVAILABLE and msg_single in ADVANCED_CONCEPTS:
-            return ADVANCED_CONCEPTS[msg_single]
-        if LINUX_CONCEPTS_AVAILABLE and msg_single in LINUX_CONCEPTS:
-            return LINUX_CONCEPTS[msg_single]
+            return spelling_notice + ADVANCED_CONCEPTS[msg_single]
+        if LINUX_CONCEPTS_AVAILABLE:
+            # Check direct match first
+            if msg_single in LINUX_CONCEPTS:
+                return spelling_notice + LINUX_CONCEPTS[msg_single]
+            # Check Linux aliases for single-word queries
+            linux_single_aliases = {
+                'chmod': 'linux_permissions', 'chown': 'linux_permissions', 'chgrp': 'linux_permissions',
+                'permissions': 'linux_permissions', 'umask': 'linux_permissions',
+                'boot': 'linux_boot', 'grub': 'grub', 'bootloader': 'grub',
+                'kernel': 'linux_kernel', 'distro': 'linux_distro',
+                'packages': 'linux_packages', 'apt': 'linux_packages', 'yum': 'linux_packages',
+                'process': 'linux_processes', 'processes': 'linux_processes',
+                'firewall': 'linux_firewall', 'iptables': 'linux_firewall',
+                'logs': 'linux_logs', 'journalctl': 'linux_logs',
+                'users': 'linux_users', 'groups': 'linux_users',
+                'filesystem': 'linux_filesystem', 'network': 'linux_networking',
+            }
+            if msg_single in linux_single_aliases:
+                alias_target = linux_single_aliases[msg_single]
+                if alias_target in LINUX_CONCEPTS:
+                    return spelling_notice + LINUX_CONCEPTS[alias_target]
         if INFRASTRUCTURE_CONCEPTS_AVAILABLE and msg_single in INFRASTRUCTURE_CONCEPTS:
-            return INFRASTRUCTURE_CONCEPTS[msg_single]
+            return spelling_notice + INFRASTRUCTURE_CONCEPTS[msg_single]
     
     # Final fallback: Direct concept lookup for multi-word queries
     msg_clean = msg_lower.strip()
     if msg_clean in CONCEPTS:
-        return CONCEPTS[msg_clean]
+        return spelling_notice + CONCEPTS[msg_clean]
     if ADVANCED_CONCEPTS_AVAILABLE and msg_clean in ADVANCED_CONCEPTS:
-        return ADVANCED_CONCEPTS[msg_clean]
+        return spelling_notice + ADVANCED_CONCEPTS[msg_clean]
     if LINUX_CONCEPTS_AVAILABLE and msg_clean in LINUX_CONCEPTS:
-        return LINUX_CONCEPTS[msg_clean]
+        return spelling_notice + LINUX_CONCEPTS[msg_clean]
     if INFRASTRUCTURE_CONCEPTS_AVAILABLE and msg_clean in INFRASTRUCTURE_CONCEPTS:
-        return INFRASTRUCTURE_CONCEPTS[msg_clean]
+        return spelling_notice + INFRASTRUCTURE_CONCEPTS[msg_clean]
     
     # Final fallback: Check for meaningful matches in all concept keys
     # Filter out common/stop words that cause false matches (e.g., 'is' in 'list')
@@ -6807,33 +7120,54 @@ What would you like to know?"""
                 return True
         return False
     
-    # Check Python CONCEPTS
-    for concept_key in CONCEPTS.keys():
-        if matches_concept(concept_key, meaningful_words, msg_clean):
-            return CONCEPTS[concept_key]
+    # Check if query has automation indicators - if so, check automation FIRST
+    final_automation_indicators = {'selenium', 'webdriver', 'robot', 'pytest', 'fixture', 
+                                   'locator', 'xpath', 'browser', 'actionchains', 'actions',
+                                   'element', 'click', 'driver', 'page', 'pom'}
+    has_automation_indicator = any(ind in meaningful_words for ind in final_automation_indicators)
+    
+    if has_automation_indicator and AUTOMATION_CONCEPTS_AVAILABLE:
+        # Check Automation FIRST for automation-related queries
+        auto_match = _match_automation_concept(msg_clean, meaningful_words)
+        if auto_match:
+            return spelling_notice + auto_match
+    
+    # Check Python CONCEPTS (only if not an automation query)
+    if not has_automation_indicator:
+        for concept_key in CONCEPTS.keys():
+            if matches_concept(concept_key, meaningful_words, msg_clean):
+                return spelling_notice + CONCEPTS[concept_key]
+    
     # Check Advanced
     if ADVANCED_CONCEPTS_AVAILABLE:
         for concept_key in ADVANCED_CONCEPTS.keys():
             if matches_concept(concept_key, meaningful_words, msg_clean):
-                return ADVANCED_CONCEPTS[concept_key]
-    # Check Automation
-    if AUTOMATION_CONCEPTS_AVAILABLE:
+                return spelling_notice + ADVANCED_CONCEPTS[concept_key]
+    
+    # Check Automation (fallback for non-indicator queries)
+    if not has_automation_indicator and AUTOMATION_CONCEPTS_AVAILABLE:
         auto_match = _match_automation_concept(msg_clean, meaningful_words)
         if auto_match:
-            return auto_match
+            return spelling_notice + auto_match
+    
+    # If automation query didn't match, try Python CONCEPTS as fallback
+    if has_automation_indicator:
+        for concept_key in CONCEPTS.keys():
+            if matches_concept(concept_key, meaningful_words, msg_clean):
+                return spelling_notice + CONCEPTS[concept_key]
     # Check Infrastructure
     if INFRASTRUCTURE_CONCEPTS_AVAILABLE:
         for concept_key in INFRASTRUCTURE_CONCEPTS.keys():
             if matches_concept(concept_key, meaningful_words, msg_clean):
-                return INFRASTRUCTURE_CONCEPTS[concept_key]
+                return spelling_notice + INFRASTRUCTURE_CONCEPTS[concept_key]
     # Check Linux
     if LINUX_CONCEPTS_AVAILABLE:
         for concept_key in LINUX_CONCEPTS.keys():
             if matches_concept(concept_key, meaningful_words, msg_clean):
-                return LINUX_CONCEPTS[concept_key]
+                return spelling_notice + LINUX_CONCEPTS[concept_key]
     
     # Default helpful response (only if nothing else worked)
-    return generate_default_response(question, function_name, user_code, user_message)
+    return spelling_notice + generate_default_response(question, function_name, user_code, user_message)
 
 
 def generate_interview_response(

@@ -8,6 +8,7 @@ import streamlit as st
 import time
 import os
 import random
+import html
 from questions import QUESTIONS, ALL_TAGS, count_questions_by_tag
 from evaluator import evaluate_user_code
 from persistence import (
@@ -44,6 +45,9 @@ from builtin_assistant import (
     get_code_review as builtin_code_review,
     get_bug_hint as builtin_bug_hint,
     get_smart_hint as builtin_smart_hint,
+    store_qa_interaction,
+    record_feedback,
+    get_learning_stats,
 )
 
 st.set_page_config(page_title="PyCode AI", page_icon="🤖", layout="wide", initial_sidebar_state="collapsed")
@@ -843,20 +847,56 @@ def run_python_code_safe(code: str) -> dict:
     
     return result
 
+def escape_html_content(text: str) -> str:
+    """Escape HTML special characters to prevent XSS and display issues."""
+    return html.escape(text, quote=False)
+
 def format_response_html(content: str) -> str:
     """Format AI response with better styling for code blocks."""
     import re
-    # Convert markdown code blocks to styled HTML
-    def replace_code_block(match):
+    
+    # First, extract code blocks and store them temporarily to avoid escaping code
+    code_blocks = []
+    def store_code_block(match):
         code = match.group(1)
+        idx = len(code_blocks)
+        code_blocks.append(code)
+        return f"__CODE_BLOCK_{idx}__"
+    
+    # Store code blocks before escaping
+    content = re.sub(r'```(?:python)?\n?(.*?)```', store_code_block, content, flags=re.DOTALL)
+    
+    # Store inline code
+    inline_codes = []
+    def store_inline_code(match):
+        code = match.group(1)
+        idx = len(inline_codes)
+        inline_codes.append(code)
+        return f"__INLINE_CODE_{idx}__"
+    
+    content = re.sub(r'`([^`]+)`', store_inline_code, content)
+    
+    # Now escape HTML in the regular text
+    formatted = escape_html_content(content)
+    
+    # Restore code blocks with styling
+    def replace_code_block(match):
+        idx = int(match.group(1))
+        code = escape_html_content(code_blocks[idx])
         return f'''<div style="position:relative;margin:12px 0">
             <div style="background:#0d1117;border:1px solid rgba(0,245,255,0.2);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8f4f8;overflow-x:auto;white-space:pre-wrap;line-height:1.5">{code}</div>
         </div>'''
     
-    # Replace ```...``` blocks
-    formatted = re.sub(r'```(?:python)?\n?(.*?)```', replace_code_block, content, flags=re.DOTALL)
-    # Convert inline `code` to styled spans
-    formatted = re.sub(r'`([^`]+)`', r'<code style="background:rgba(0,245,255,0.15);color:#00f5ff;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px">\1</code>', formatted)
+    formatted = re.sub(r'__CODE_BLOCK_(\d+)__', replace_code_block, formatted)
+    
+    # Restore inline code with styling
+    def replace_inline_code(match):
+        idx = int(match.group(1))
+        code = escape_html_content(inline_codes[idx])
+        return f'<code style="background:rgba(0,245,255,0.15);color:#00f5ff;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px">{code}</code>'
+    
+    formatted = re.sub(r'__INLINE_CODE_(\d+)__', replace_inline_code, formatted)
+    
     # Convert **bold** to styled spans
     formatted = re.sub(r'\*\*([^*]+)\*\*', r'<strong style="color:#00ff88;font-weight:600">\1</strong>', formatted)
     # Convert headers ## to styled divs
@@ -871,11 +911,9 @@ def format_response_html(content: str) -> str:
 
 @st.dialog("AI Chat Assistant", width="large")
 def show_chat_modal():
-    """Redesigned AI Chat with wider chat area and compact sidebar controls"""
+    """Clean, advanced AI Chat interface with streamlined layout"""
     
     # Initialize chat states
-    if "chat_tab" not in st.session_state:
-        st.session_state.chat_tab = "Python"
     if "chat_loading" not in st.session_state:
         st.session_state.chat_loading = False
     if "response_mode" not in st.session_state:
@@ -884,17 +922,19 @@ def show_chat_modal():
         st.session_state.code_output = None
     if "last_user_msg" not in st.session_state:
         st.session_state.last_user_msg = None
+    if "prompt_category" not in st.session_state:
+        st.session_state.prompt_category = "Python"
     
-    # Enhanced CSS for new layout
+    # Clean CSS for modern layout
     st.markdown("""
     <style>
     [data-testid="stDialog"] > div { 
         background: linear-gradient(180deg, #0a1628 0%, #061018 100%) !important; 
-        border: 2px solid rgba(0, 245, 255, 0.3) !important; 
-        border-radius: 20px !important;
-        box-shadow: 0 0 50px rgba(0, 245, 255, 0.2), inset 0 0 30px rgba(0, 245, 255, 0.03) !important;
-        max-width: 95vw !important;
-        width: 95vw !important;
+        border: 1px solid rgba(0, 245, 255, 0.25) !important; 
+        border-radius: 16px !important;
+        box-shadow: 0 0 40px rgba(0, 245, 255, 0.15) !important;
+        max-width: 90vw !important;
+        width: 90vw !important;
     }
     [data-testid="stDialog"] .stMarkdown p { color: #e8f4f8 !important; }
     [data-testid="stDialog"] .stMarkdown li { color: #e8f4f8 !important; }
@@ -908,28 +948,27 @@ def show_chat_modal():
     }
     .typing-dot:nth-child(2) { animation-delay: 0.2s; }
     .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    .sidebar-section { 
-        background: rgba(0,20,40,0.5); border: 1px solid rgba(0,245,255,0.15); 
-        border-radius: 10px; padding: 10px; margin-bottom: 10px;
-    }
-    .sidebar-label { 
-        font-size: 9px; color: #4a6380; letter-spacing: 1.5px; 
-        margin-bottom: 6px; font-weight: 600;
-    }
     .chat-msg-user {
         background: linear-gradient(135deg, #00ff88, #00cc6a); color: #030508;
-        padding: 12px 16px; border-radius: 16px 16px 4px 16px; margin: 10px 0 10px 60px;
-        font-size: 13px; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,255,136,0.25);
+        padding: 12px 16px; border-radius: 16px 16px 4px 16px; margin: 8px 0 8px 80px;
+        font-size: 13px; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,255,136,0.2);
     }
     .chat-msg-ai {
-        background: linear-gradient(135deg, rgba(0,245,255,0.1), rgba(10,20,40,0.95));
-        border: 1px solid rgba(0,245,255,0.25); color: #e8f4f8;
-        padding: 14px 18px; border-radius: 16px 16px 16px 4px; margin: 10px 60px 10px 0;
-        font-size: 13px; line-height: 1.6; box-shadow: 0 4px 15px rgba(0,245,255,0.1);
+        background: linear-gradient(135deg, rgba(0,245,255,0.08), rgba(10,20,40,0.95));
+        border: 1px solid rgba(0,245,255,0.2); color: #e8f4f8;
+        padding: 14px 18px; border-radius: 16px 16px 16px 4px; margin: 8px 80px 8px 0;
+        font-size: 13px; line-height: 1.6; box-shadow: 0 4px 15px rgba(0,245,255,0.08);
     }
-    .prompt-btn { 
-        font-size: 11px !important; padding: 6px 10px !important; 
-        margin: 3px 0 !important; border-radius: 8px !important;
+    .quick-btn {
+        font-size: 11px !important; padding: 8px 12px !important; 
+        border-radius: 20px !important; margin: 2px !important;
+        background: rgba(0,245,255,0.08) !important;
+        border: 1px solid rgba(0,245,255,0.2) !important;
+        transition: all 0.2s ease !important;
+    }
+    .quick-btn:hover {
+        background: rgba(0,245,255,0.15) !important;
+        border-color: rgba(0,245,255,0.4) !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -942,8 +981,6 @@ def show_chat_modal():
         st.session_state.chat_history.append({"role": "user", "content": msg})
         st.session_state.chat_loading = True
         try:
-            # Pass raw user message to generate_response for clean concept matching
-            # Don't concatenate mode/context - it confuses topic detection
             if st.session_state.stage:
                 d = QUESTIONS[st.session_state.stage][st.session_state.q_index]
                 cc = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "")
@@ -951,181 +988,154 @@ def show_chat_modal():
             else:
                 resp = builtin_chat(msg, "", "", "", False)
             st.session_state.chat_history.append({"role": "assistant", "content": resp})
+            try:
+                store_qa_interaction(msg, resp)
+            except Exception:
+                pass
         except Exception as e:
             st.session_state.chat_history.append({"role": "assistant", "content": f"Error: {str(e)[:100]}"})
         st.session_state.chat_loading = False
         st.session_state.code_output = None
     
-    # ========== MAIN LAYOUT: Sidebar (narrow) + Chat Area (wide) ==========
-    sidebar_col, chat_col = st.columns([1, 4])
+    # ========== HEADER BAR ==========
+    stats = get_learning_stats()
+    total_qas = stats.get("total_interactions", 0)
     
-    # ========== LEFT SIDEBAR - Controls ==========
-    with sidebar_col:
-        # Header
+    # Header with topic tabs and actions
+    header_cols = st.columns([3, 5, 2])
+    
+    with header_cols[0]:
         st.markdown("""
-        <div style="text-align:center;padding:8px 0 12px">
-            <div style="font-size:28px;margin-bottom:4px">🤖</div>
-            <div style="font-size:10px;color:#00f5ff;font-weight:600;letter-spacing:1px">AI ASSISTANT</div>
+        <div style="display:flex;align-items:center;gap:10px">
+            <div style="font-size:24px">🤖</div>
+            <div>
+                <div style="font-size:14px;font-weight:700;color:#fff">PyCode AI</div>
+                <div style="font-size:10px;color:#8fa3b8">Python • Selenium • Linux • Network</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Response Mode Toggle
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown('<div class="sidebar-label">RESPONSE MODE</div>', unsafe_allow_html=True)
-        mode_options = ["📝 Detailed", "⚡ Concise"]
-        current_mode = 0 if st.session_state.response_mode == "detailed" else 1
-        selected_mode = st.radio("Mode", mode_options, index=current_mode, key="mode_radio", label_visibility="collapsed")
-        new_mode = "detailed" if "Detailed" in selected_mode else "concise"
-        if new_mode != st.session_state.response_mode:
-            st.session_state.response_mode = new_mode
-            st.session_state.reopen_chat = True
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Quick Prompts Section
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown('<div class="sidebar-label">QUICK PROMPTS</div>', unsafe_allow_html=True)
-        
-        prompt_category = st.selectbox("Category", ["🐍 Python", "🌐 Selenium", "🤖 Robot", "💡 Help", "🖥️ Linux", "🌐 Network"], 
-                                       key="prompt_cat", label_visibility="collapsed")
-        
-        category_map = {"🐍 Python": "Python", "🌐 Selenium": "Selenium", "🤖 Robot": "Robot", "💡 Help": "Help",
-                        "🖥️ Linux": "Linux", "🌐 Network": "Network"}
-        cat_key = category_map.get(prompt_category, "Python")
-        
-        # Add Linux and Network prompts
-        extended_prompts = {
-            **CHAT_PROMPTS,
-            "Linux": [("What is Linux?", "🐧"), ("Explain systemd", "⚡"), ("Bash scripting", "📜")],
-            "Network": [("What is TCP/IP?", "🌐"), ("Explain DNS", "📡"), ("What is HTTP?", "🔗")]
-        }
-        
-        if cat_key in extended_prompts:
-            for prompt, icon in extended_prompts[cat_key]:
-                if st.button(f"{icon} {prompt}", key=f"sb_{cat_key}_{prompt[:10]}", use_container_width=True):
-                    st.session_state.pending_chat_msg = prompt
+    
+    with header_cols[1]:
+        # Topic selector as pill buttons
+        topics = ["🐍 Python", "🌐 Selenium", "🤖 Robot", "🐧 Linux", "🌐 Network"]
+        topic_cols = st.columns(len(topics))
+        for i, topic in enumerate(topics):
+            with topic_cols[i]:
+                topic_name = topic.split()[-1]
+                is_selected = st.session_state.prompt_category == topic_name
+                if st.button(topic, key=f"topic_{topic_name}", use_container_width=True, 
+                           type="primary" if is_selected else "secondary"):
+                    st.session_state.prompt_category = topic_name
                     st.session_state.reopen_chat = True
                     st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+    
+    with header_cols[2]:
+        # Quick actions
+        action_cols = st.columns(3)
+        with action_cols[0]:
+            mode_icon = "⚡" if st.session_state.response_mode == "concise" else "📝"
+            if st.button(mode_icon, key="toggle_mode", help="Toggle Detailed/Concise"):
+                st.session_state.response_mode = "concise" if st.session_state.response_mode == "detailed" else "detailed"
+                st.session_state.reopen_chat = True
+                st.rerun()
+        with action_cols[1]:
+            if st.button("🗑️", key="clear_chat_header", help="Clear Chat"):
+                st.session_state.chat_history = []
+                st.session_state.code_output = None
+                st.session_state.reopen_chat = True
+                st.rerun()
+        with action_cols[2]:
+            st.markdown(f"""<div style="font-size:10px;color:#00f5ff;text-align:center;padding:8px 0">
+                {total_qas} Q&As
+            </div>""", unsafe_allow_html=True)
+    
+    st.markdown("<hr style='margin:8px 0;border-color:rgba(0,245,255,0.15)'>", unsafe_allow_html=True)
+    
+    # ========== MAIN LAYOUT ==========
+    main_cols = st.columns([1, 5])
+    
+    # ========== LEFT SIDEBAR - Quick Prompts ==========
+    with main_cols[0]:
+        # Show prompts based on selected category
+        cat_key = st.session_state.prompt_category
         
-        # Actions Section
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown('<div class="sidebar-label">ACTIONS</div>', unsafe_allow_html=True)
+        extended_prompts = {
+            "Python": [("What is class?", "🏗️"), ("Explain loops", "🔄"), ("List vs Tuple", "📊"), ("Functions", "⚡")],
+            "Selenium": [("What is Selenium?", "🌐"), ("Locators", "🎯"), ("Waits", "⏳"), ("Actions", "🖱️")],
+            "Robot": [("Robot Framework", "🤖"), ("Keywords", "🔑"), ("Variables", "📦"), ("Libraries", "📚")],
+            "Linux": [("What is Linux?", "🐧"), ("Bash scripting", "📜"), ("systemd", "⚡"), ("chmod", "🔐")],
+            "Network": [("TCP/IP", "🌐"), ("DNS", "📡"), ("HTTP", "🔗"), ("Firewall", "🔥")]
+        }
         
-        if st.button("🗑️ Clear Chat", key="clear_chat_sb", use_container_width=True):
-            st.session_state.chat_history = []
-            st.session_state.code_output = None
-            st.session_state.reopen_chat = True
-            st.rerun()
+        st.markdown(f"<div style='font-size:9px;color:#4a6380;letter-spacing:1px;margin-bottom:8px'>QUICK ASK</div>", unsafe_allow_html=True)
         
-        if st.button("📄 Explain My Code", key="explain_code_sb", use_container_width=True):
-            code = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "# No code yet")
-            st.session_state.pending_chat_msg = f"Explain this code:\n```python\n{code[:500]}\n```"
-            st.session_state.reopen_chat = True
-            st.rerun()
+        for prompt, icon in extended_prompts.get(cat_key, []):
+            if st.button(f"{icon} {prompt}", key=f"qp_{cat_key}_{prompt[:8]}", use_container_width=True):
+                st.session_state.pending_chat_msg = prompt
+                st.session_state.reopen_chat = True
+                st.rerun()
         
-        # Message Actions (if there's a conversation)
-        if st.session_state.chat_history and len(st.session_state.chat_history) >= 2:
-            last_ai_msg = None
-            for msg in reversed(st.session_state.chat_history):
-                if msg["role"] == "assistant":
-                    last_ai_msg = msg["content"]
-                    break
-            
-            if last_ai_msg:
-                st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
-                st.markdown('<div class="sidebar-label">MESSAGE</div>', unsafe_allow_html=True)
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("📋", key="copy_sb", use_container_width=True, help="Copy"):
-                        st.session_state.copied_text = last_ai_msg
-                        st.toast("✅ Copied!")
-                with c2:
-                    if st.button("🔄", key="regen_sb", use_container_width=True, help="Regenerate"):
-                        if st.session_state.last_user_msg:
-                            if st.session_state.chat_history[-1]["role"] == "assistant":
-                                st.session_state.chat_history.pop()
-                            if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
-                                st.session_state.chat_history.pop()
-                            st.session_state.pending_chat_msg = st.session_state.last_user_msg
-                            st.session_state.reopen_chat = True
-                            st.rerun()
-                
-                # Run code if available
-                code_blocks = extract_code_blocks(last_ai_msg)
+        # Divider
+        st.markdown("<hr style='margin:12px 0;border-color:rgba(0,245,255,0.1)'>", unsafe_allow_html=True)
+        
+        # Action buttons
+        if st.session_state.chat_history:
+            last_ai = next((m["content"] for m in reversed(st.session_state.chat_history) if m["role"] == "assistant"), None)
+            if last_ai:
+                code_blocks = extract_code_blocks(last_ai)
                 if code_blocks:
-                    if st.button("▶️ Run Code", key="run_sb", use_container_width=True):
-                        result = run_python_code_safe(code_blocks[0])
-                        st.session_state.code_output = result
+                    if st.button("▶️ Run Code", key="run_code_btn", use_container_width=True):
+                        st.session_state.code_output = run_python_code_safe(code_blocks[0])
                         st.session_state.reopen_chat = True
                         st.rerun()
                 
-                # Feedback
-                fb1, fb2 = st.columns(2)
-                with fb1:
-                    if st.button("👍", key="up_sb", use_container_width=True):
-                        st.toast("Thanks! 🎉")
-                with fb2:
-                    if st.button("👎", key="down_sb", use_container_width=True):
-                        st.toast("Noted! 🔧")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("👍", key="fb_up", help="Good"):
+                        record_feedback(st.session_state.last_user_msg or "", last_ai, True)
+                        st.toast("Thanks! 🧠")
+                with c2:
+                    if st.button("👎", key="fb_down", help="Improve"):
+                        record_feedback(st.session_state.last_user_msg or "", last_ai, False)
+                        st.toast("Noted! 📝")
     
-    # ========== RIGHT SIDE - Main Chat Area ==========
-    with chat_col:
-        # Chat Header
-        st.markdown("""
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,245,255,0.2);margin-bottom:12px">
-            <div style="display:flex;align-items:center;gap:12px">
-                <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(0,245,255,0.2),rgba(191,0,255,0.1));border:2px solid rgba(0,245,255,0.4);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#00f5ff">&lt;/&gt;</div>
-                <div>
-                    <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:#fff">CHAT</div>
-                    <div style="font-size:10px;color:#8fa3b8">Python • Selenium • Robot • Linux • Network</div>
-                </div>
-            </div>
-            <div style="font-size:10px;color:#00ff88;padding:4px 10px;background:rgba(0,255,136,0.1);border-radius:12px;border:1px solid rgba(0,255,136,0.3)">
-                """ + ("⚡ Concise" if st.session_state.response_mode == "concise" else "📝 Detailed") + """
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # ========== LARGE CHAT CONTAINER ==========
-        chat_container = st.container(height=520)
+    # ========== MAIN CHAT AREA ==========
+    with main_cols[1]:
+        # Chat container
+        chat_container = st.container(height=480)
         with chat_container:
             if not st.session_state.chat_history:
                 st.markdown("""
-                <div style="text-align:center;padding:80px 40px">
-                    <div style="font-size:60px;margin-bottom:16px;text-shadow:0 0 40px rgba(0,245,255,0.5)">🤖</div>
-                    <div style="font-family:'Orbitron',sans-serif;font-size:18px;font-weight:600;color:#fff;margin-bottom:8px">START A CONVERSATION</div>
-                    <div style="color:#8fa3b8;font-size:13px;line-height:1.6;max-width:400px;margin:0 auto">
-                        Ask me about Python, Selenium, Robot Framework, Linux, Networking, or any coding concept!
-                    </div>
+                <div style="text-align:center;padding:100px 40px">
+                    <div style="font-size:50px;margin-bottom:16px;opacity:0.8">🤖</div>
+                    <div style="font-size:16px;font-weight:600;color:#fff;margin-bottom:8px">Ask me anything!</div>
+                    <div style="color:#8fa3b8;font-size:12px">Python • Selenium • Robot • Linux • Network</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                for idx, m in enumerate(st.session_state.chat_history[-15:]):
+                # Display messages - clean and simple
+                for m in st.session_state.chat_history[-20:]:
                     if m["role"] == "user":
+                        user_content = escape_html_content(m["content"][:500])
                         st.markdown(f'''
                         <div class="chat-msg-user">
-                            <div style="font-size:9px;font-weight:600;opacity:0.7;margin-bottom:4px;letter-spacing:1px">YOU</div>
-                            {m["content"][:600]}{"..." if len(m["content"]) > 600 else ""}
+                            <div style="font-size:9px;opacity:0.6;margin-bottom:4px">YOU</div>
+                            {user_content}{"..." if len(m["content"]) > 500 else ""}
                         </div>
                         ''', unsafe_allow_html=True)
                     else:
                         formatted = format_response_html(m["content"])
                         st.markdown(f'''
                         <div class="chat-msg-ai">
-                            <div style="font-size:9px;font-weight:600;color:#00f5ff;margin-bottom:6px;letter-spacing:1px">AI ASSISTANT</div>
-                            <div style="color:#e8f4f8">{formatted}</div>
+                            <div style="font-size:9px;color:#00f5ff;margin-bottom:5px">AI</div>
+                            <div>{formatted}</div>
                         </div>
                         ''', unsafe_allow_html=True)
                 
                 # Typing indicator
                 if st.session_state.get("chat_loading"):
                     st.markdown('''
-                    <div class="chat-msg-ai" style="display:inline-block">
-                        <div style="font-size:9px;color:#00f5ff;margin-bottom:5px;letter-spacing:1px">AI ASSISTANT</div>
+                    <div class="chat-msg-ai" style="display:inline-block;padding:10px 16px">
                         <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
                     </div>
                     ''', unsafe_allow_html=True)
@@ -1135,48 +1145,33 @@ def show_chat_modal():
             result = st.session_state.code_output
             if result['success']:
                 output_text = result['output'] if result['output'] else "(No output)"
-                st.markdown(f'''
-                <div style="background:#0a1a0f;border:1px solid rgba(0,255,136,0.4);border-radius:10px;padding:12px 16px;margin:8px 0">
-                    <div style="font-size:10px;color:#00ff88;margin-bottom:6px;letter-spacing:1px;font-weight:600">✓ CODE OUTPUT</div>
-                    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8f4f8;white-space:pre-wrap">{output_text}</div>
-                </div>
-                ''', unsafe_allow_html=True)
+                st.success(f"```\n{output_text}\n```")
             else:
-                st.markdown(f'''
-                <div style="background:#1a0a0a;border:1px solid rgba(255,100,100,0.4);border-radius:10px;padding:12px 16px;margin:8px 0">
-                    <div style="font-size:10px;color:#ff6b6b;margin-bottom:6px;letter-spacing:1px;font-weight:600">✗ ERROR</div>
-                    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#ff9999;white-space:pre-wrap">{result['error']}</div>
-                </div>
-                ''', unsafe_allow_html=True)
+                st.error(f"```\n{result['error']}\n```")
         
-        # Follow-up suggestions (inline with chat)
+        # Follow-up suggestions
         if st.session_state.chat_history:
-            last_resp = ""
-            for msg in reversed(st.session_state.chat_history):
-                if msg["role"] == "assistant":
-                    last_resp = msg["content"]
-                    break
+            last_resp = next((m["content"] for m in reversed(st.session_state.chat_history) if m["role"] == "assistant"), "")
             if last_resp:
                 followups = get_followups(last_resp)
                 fu_cols = st.columns(3)
                 for i, fu in enumerate(followups):
                     with fu_cols[i]:
-                        if st.button(fu, key=f"fu_main_{i}", use_container_width=True):
+                        if st.button(fu, key=f"fu_{i}", use_container_width=True):
                             st.session_state.pending_chat_msg = fu
                             st.session_state.reopen_chat = True
                             st.rerun()
         
-        # Input form at bottom
-        st.markdown('<div style="height:8px"></div>', unsafe_allow_html=True)
-        with st.form(key="chat_form_new", clear_on_submit=True):
-            input_col, send_col = st.columns([6, 1])
-            with input_col:
-                user_msg = st.text_input("Message", placeholder="Ask anything about Python, Linux, Networking...", 
-                                         key="chat_input_main", label_visibility="collapsed")
-            with send_col:
-                send_btn = st.form_submit_button("Send", type="primary", use_container_width=True)
+        # Input form
+        with st.form(key="chat_form", clear_on_submit=True):
+            cols = st.columns([6, 1])
+            with cols[0]:
+                user_msg = st.text_input("", placeholder="Type your question here...", 
+                                         key="chat_input", label_visibility="collapsed")
+            with cols[1]:
+                send = st.form_submit_button("➤", type="primary", use_container_width=True)
             
-            if send_btn and user_msg:
+            if send and user_msg:
                 st.session_state.pending_chat_msg = user_msg
                 st.session_state.reopen_chat = True
                 st.rerun()
@@ -1212,7 +1207,7 @@ with header_cols[1]:
             -webkit-background-clip:text;-webkit-text-fill-color:transparent;
             animation:shine 3s linear infinite;
             text-shadow:0 0 40px rgba(0,245,255,0.5);
-        ">PYCODE</div>
+        ">NUTANIX PYCODE</div>
         <div style="font-family:'Orbitron',sans-serif;font-size:0.6rem;color:#4a6380;letter-spacing:4px;margin-top:4px">CYBER · CODING · PLATFORM</div>
     </div>
     <style>@keyframes shine{0%{background-position:0% center}100%{background-position:200% center}}</style>
@@ -1735,7 +1730,7 @@ with c2:
             params = ", ".join([f"arg{j+1}" for j in range(len(tc[0][0]))])
         template = f"def {data['function']}({params}):\n    # Your code here\n    pass"
         
-        st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">solution.py</span></div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">Write your code below</span></div></div>', unsafe_allow_html=True)
         
         code = st.text_area("", value=template, height=120, key=f"code_{stage}_{qi}", label_visibility="collapsed")
         
@@ -1761,20 +1756,24 @@ with c2:
         if run_btn:
             ok, msg = evaluate_user_code(code, data["function"], data["test_cases"])
             if ok:
+                # SUCCESS: All tests passed
                 el = time.time() - st.session_state.timer_start
-                st.markdown(f'<div class="msg-ok">All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="msg-ok">✅ All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
                 st.session_state.passed = True
                 st.session_state.progress[stage]["completed"].add(qi)
                 st.session_state.progress[stage]["skipped"].discard(qi)
                 st.session_state.progress = save_question_time(st.session_state.progress, stage, qi, el)
                 save_progress(st.session_state.progress)
-                with st.spinner("Analyzing..."):
+                # Generate code review only on success
+                with st.spinner("Analyzing your solution..."):
                     try:
                         st.session_state.ai_feedback = builtin_code_review(code, data['question'], data['function'], el)
                     except Exception:
                         pass
+            else:
+                # FAILURE: Tests failed - show error and bug hint
                 st.markdown(f'<div class="msg-err">{msg}</div>', unsafe_allow_html=True)
-                with st.spinner("Analyzing..."):
+                with st.spinner("Analyzing error..."):
                     try:
                         bug = builtin_bug_hint(code, msg, data['question'], data['function'])
                         st.markdown(f'<div class="msg-hint">{bug}</div>', unsafe_allow_html=True)
@@ -1791,9 +1790,71 @@ with c2:
             go_to(stage, (qi + 1) % t)
             st.rerun()
         
+        # Display TEST CASES with actual results if code was run
         st.markdown('<div class="section-title sec-purple">TEST CASES</div>', unsafe_allow_html=True)
-        for inp, exp in data["test_cases"][:3]:
-            st.markdown(f'<div class="test-case"><span class="test-lbl">Input:</span> {inp} → <span class="test-lbl">Output:</span> {exp}</div>', unsafe_allow_html=True)
+        
+        # Check if we have test results to show (after running code)
+        test_results_key = f"test_results_{stage}_{qi}"
+        if run_btn:
+            # Run each test case and store results
+            test_results = []
+            try:
+                # Compile and execute user code to get the function
+                safe_env = {'__builtins__': {
+                    'range': range, 'len': len, 'int': int, 'str': str, 'list': list, 
+                    'dict': dict, 'set': set, 'tuple': tuple, 'bool': bool, 'float': float,
+                    'sum': sum, 'min': min, 'max': max, 'abs': abs, 'sorted': sorted,
+                    'enumerate': enumerate, 'zip': zip, 'map': map, 'filter': filter,
+                    'True': True, 'False': False, 'None': None, 'print': lambda *args: None,
+                    'reversed': reversed, 'any': any, 'all': all, 'pow': pow, 'round': round,
+                    'divmod': divmod, 'isinstance': isinstance, 'type': type,
+                }}
+                exec(compile(code, '<user_code>', 'exec'), safe_env)
+                func = safe_env.get(data["function"])
+                
+                if func:
+                    for inp, exp in data["test_cases"][:3]:
+                        try:
+                            actual = func(*inp)
+                            passed = actual == exp
+                            test_results.append((inp, exp, actual, passed, None))
+                        except Exception as e:
+                            test_results.append((inp, exp, None, False, str(e)))
+                else:
+                    test_results = [(inp, exp, None, False, "Function not found") for inp, exp in data["test_cases"][:3]]
+            except Exception as e:
+                test_results = [(inp, exp, None, False, f"Code error: {str(e)[:50]}") for inp, exp in data["test_cases"][:3]]
+            
+            st.session_state[test_results_key] = test_results
+        
+        # Display test cases with results if available
+        if test_results_key in st.session_state and st.session_state[test_results_key]:
+            for inp, exp, actual, passed, error in st.session_state[test_results_key]:
+                if error:
+                    st.markdown(f'''
+                    <div class="test-case" style="border-left:3px solid #ff6b6b">
+                        <span class="test-lbl">❌ Input:</span> {inp} → 
+                        <span class="test-lbl">Expected:</span> {exp} | 
+                        <span style="color:#ff6b6b">Error: {error}</span>
+                    </div>''', unsafe_allow_html=True)
+                elif passed:
+                    st.markdown(f'''
+                    <div class="test-case" style="border-left:3px solid #00ff88">
+                        <span class="test-lbl">✅ Input:</span> {inp} → 
+                        <span class="test-lbl">Expected:</span> {exp} | 
+                        <span style="color:#00ff88">Got: {actual}</span>
+                    </div>''', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'''
+                    <div class="test-case" style="border-left:3px solid #ff6b6b">
+                        <span class="test-lbl">❌ Input:</span> {inp} → 
+                        <span class="test-lbl">Expected:</span> {exp} | 
+                        <span style="color:#ff6b6b">Got: {actual}</span>
+                    </div>''', unsafe_allow_html=True)
+        else:
+            # Show expected outputs only (before running)
+            for inp, exp in data["test_cases"][:3]:
+                st.markdown(f'<div class="test-case"><span class="test-lbl">Input:</span> {inp} → <span class="test-lbl">Expected:</span> {exp}</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown('''
