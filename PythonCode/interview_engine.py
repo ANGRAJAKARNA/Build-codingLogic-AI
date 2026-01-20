@@ -2,25 +2,40 @@
 """
 Interview Engine Module for PyCode.
 Manages interview state, stages, scoring, and context-aware question generation.
+Supports both text-only and voice-enabled interview modes.
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 import random
 import re
 
+# Voice engine imports (optional - graceful fallback if not available)
+VOICE_AVAILABLE = False
+try:
+    from voice_engine import (
+        VoiceConfig, VoiceMode, VoiceInterviewer, 
+        VOICE_SCRIPTS, get_voice_capabilities, TTSEngine
+    )
+    VOICE_AVAILABLE = True
+except ImportError:
+    # Voice features not available
+    pass
+
 
 class InterviewStage(Enum):
     """Stages of a mock interview."""
-    INTRO = "intro"
-    APPROACH = "approach"
-    CODING = "coding"
-    OPTIMIZATION = "optimization"
-    BEHAVIORAL = "behavioral"
-    WRAPUP = "wrapup"
-    COMPLETED = "completed"
+    GREETING = "greeting"           # Voice mode: Initial greeting
+    SELF_INTRO = "self_intro"       # Voice mode: User self-introduction
+    INTRO = "intro"                 # Problem introduction
+    APPROACH = "approach"           # Solution approach discussion
+    CODING = "coding"               # Implementation phase
+    OPTIMIZATION = "optimization"   # Complexity analysis
+    BEHAVIORAL = "behavioral"       # Behavioral questions
+    WRAPUP = "wrapup"              # Final questions
+    COMPLETED = "completed"         # Interview finished
 
 
 class InterviewDifficulty(Enum):
@@ -107,6 +122,12 @@ class InterviewConfig:
     show_live_score: bool = False
     include_behavioral: bool = True
     
+    # Voice mode settings
+    voice_enabled: bool = False
+    voice_config: Any = None  # VoiceConfig when voice is enabled
+    self_intro_duration: int = 30  # seconds for self-introduction
+    greeting_pause: float = 3.0    # seconds to pause after greeting
+    
     def get_stage_time_allocation(self) -> Dict[InterviewStage, int]:
         """Get recommended time in minutes for each stage."""
         total = self.time_limit_minutes
@@ -165,11 +186,28 @@ class InterviewState:
     problem_name: str = ""
     function_name: str = ""
     
+    # Voice mode state
+    voice_enabled: bool = False
+    self_introduction: str = ""
+    greeting_completed: bool = False
+    self_intro_completed: bool = False
+    current_voice_prompt: str = ""
+    detected_experience_level: str = ""  # Detected from self-intro
+    detected_expertise_areas: List[str] = field(default_factory=list)
+    
     def start_interview(self, problem: str, function: str):
         """Initialize a new interview session."""
         self.start_time = datetime.now()
         self.stage_start_time = datetime.now()
-        self.current_stage = InterviewStage.INTRO
+        
+        # Set initial stage based on voice mode
+        if self.config.voice_enabled:
+            self.current_stage = InterviewStage.GREETING
+            self.voice_enabled = True
+        else:
+            self.current_stage = InterviewStage.INTRO
+            self.voice_enabled = False
+        
         self.problem_name = problem
         self.function_name = function
         self.conversation_history = []
@@ -178,30 +216,61 @@ class InterviewState:
         self.topics_covered = []
         self.scores = InterviewScores()
         
+        # Reset voice state
+        self.self_introduction = ""
+        self.greeting_completed = False
+        self.self_intro_completed = False
+        self.current_voice_prompt = ""
+        self.detected_experience_level = ""
+        self.detected_expertise_areas = []
+        
     def advance_stage(self) -> InterviewStage:
         """Move to the next interview stage."""
-        stage_order = [
-            InterviewStage.INTRO,
-            InterviewStage.APPROACH,
-            InterviewStage.CODING,
-            InterviewStage.OPTIMIZATION,
-            InterviewStage.BEHAVIORAL,
-            InterviewStage.WRAPUP,
-            InterviewStage.COMPLETED,
-        ]
+        # Build stage order based on mode
+        if self.voice_enabled:
+            # Voice mode includes greeting and self-intro stages
+            stage_order = [
+                InterviewStage.GREETING,
+                InterviewStage.SELF_INTRO,
+                InterviewStage.INTRO,
+                InterviewStage.APPROACH,
+                InterviewStage.CODING,
+                InterviewStage.OPTIMIZATION,
+                InterviewStage.BEHAVIORAL,
+                InterviewStage.WRAPUP,
+                InterviewStage.COMPLETED,
+            ]
+        else:
+            # Text-only mode
+            stage_order = [
+                InterviewStage.INTRO,
+                InterviewStage.APPROACH,
+                InterviewStage.CODING,
+                InterviewStage.OPTIMIZATION,
+                InterviewStage.BEHAVIORAL,
+                InterviewStage.WRAPUP,
+                InterviewStage.COMPLETED,
+            ]
         
         # Skip behavioral if not included
         if not self.config.include_behavioral:
-            stage_order.remove(InterviewStage.BEHAVIORAL)
+            if InterviewStage.BEHAVIORAL in stage_order:
+                stage_order.remove(InterviewStage.BEHAVIORAL)
         
         # Skip behavioral for pure technical
         if self.config.interview_type == InterviewType.TECHNICAL:
             if InterviewStage.BEHAVIORAL in stage_order:
                 stage_order.remove(InterviewStage.BEHAVIORAL)
         
-        current_idx = stage_order.index(self.current_stage)
-        if current_idx < len(stage_order) - 1:
-            self.current_stage = stage_order[current_idx + 1]
+        # Find current position and advance
+        try:
+            current_idx = stage_order.index(self.current_stage)
+            if current_idx < len(stage_order) - 1:
+                self.current_stage = stage_order[current_idx + 1]
+                self.stage_start_time = datetime.now()
+        except ValueError:
+            # Current stage not in order, go to INTRO or first stage
+            self.current_stage = stage_order[0]
             self.stage_start_time = datetime.now()
         
         return self.current_stage
@@ -237,6 +306,209 @@ class InterviewEngine:
     
     def __init__(self, state: Optional[InterviewState] = None):
         self.state = state or InterviewState()
+        self.voice_interviewer = None  # VoiceInterviewer instance when voice mode enabled
+    
+    # =========================================================================
+    # VOICE MODE METHODS
+    # =========================================================================
+    
+    def enable_voice_mode(self, voice_config: Any = None) -> bool:
+        """
+        Enable voice mode for the interview.
+        
+        Args:
+            voice_config: VoiceConfig instance (optional)
+            
+        Returns:
+            True if voice mode enabled successfully, False if not available
+        """
+        if not VOICE_AVAILABLE:
+            return False
+        
+        try:
+            # Create voice interviewer
+            from voice_engine import VoiceInterviewer, VoiceConfig, VoiceMode
+            
+            if voice_config is None:
+                voice_config = VoiceConfig(mode=VoiceMode.VOICE_ENABLED)
+            
+            self.voice_interviewer = VoiceInterviewer(voice_config)
+            self.state.config.voice_enabled = True
+            self.state.config.voice_config = voice_config
+            self.state.voice_enabled = True
+            
+            return True
+        except Exception as e:
+            print(f"Failed to enable voice mode: {e}")
+            return False
+    
+    def is_voice_enabled(self) -> bool:
+        """Check if voice mode is enabled."""
+        return self.state.voice_enabled and self.voice_interviewer is not None
+    
+    def get_voice_prompt(self, stage: InterviewStage = None) -> Tuple[str, Optional[bytes]]:
+        """
+        Get the voice prompt (text and audio) for a stage.
+        
+        Args:
+            stage: Interview stage (uses current stage if None)
+            
+        Returns:
+            Tuple of (prompt_text, audio_bytes or None)
+        """
+        if stage is None:
+            stage = self.state.current_stage
+        
+        # Get the text prompt for the stage
+        text = self._get_stage_voice_text(stage)
+        self.state.current_voice_prompt = text
+        
+        # Generate audio if voice mode is enabled
+        audio = None
+        if self.is_voice_enabled() and self.voice_interviewer:
+            audio = self.voice_interviewer.speak(text, cache_key=stage.value)
+        
+        return text, audio
+    
+    def _get_stage_voice_text(self, stage: InterviewStage) -> str:
+        """Get the voice text for a specific stage."""
+        if VOICE_AVAILABLE:
+            try:
+                from voice_engine import VOICE_SCRIPTS
+                
+                stage_scripts = {
+                    InterviewStage.GREETING: VOICE_SCRIPTS.get("greeting", "Hi, please settle down for the interview."),
+                    InterviewStage.SELF_INTRO: VOICE_SCRIPTS.get("intro_request", "Please introduce yourself. You have about 30 seconds."),
+                    InterviewStage.INTRO: f"Here is your problem: {self.state.problem_name}",
+                    InterviewStage.APPROACH: VOICE_SCRIPTS.get("approach_request", "Please explain your approach to solving this problem."),
+                    InterviewStage.CODING: VOICE_SCRIPTS.get("coding_start", "Go ahead and implement your solution."),
+                    InterviewStage.OPTIMIZATION: VOICE_SCRIPTS.get("optimization_request", "What's the time and space complexity of your solution?"),
+                    InterviewStage.BEHAVIORAL: VOICE_SCRIPTS.get("behavioral_intro", "Let's discuss some behavioral questions."),
+                    InterviewStage.WRAPUP: VOICE_SCRIPTS.get("wrapup", "We're coming to the end. Do you have any questions for me?"),
+                    InterviewStage.COMPLETED: VOICE_SCRIPTS.get("goodbye", "Thank you for your time today."),
+                }
+                return stage_scripts.get(stage, "")
+            except ImportError:
+                pass
+        
+        # Fallback text prompts
+        fallback_scripts = {
+            InterviewStage.GREETING: "Hi, please settle down for the interview.",
+            InterviewStage.SELF_INTRO: "Please introduce yourself. You have about 30 seconds.",
+            InterviewStage.INTRO: f"Here is your problem: {self.state.problem_name}",
+            InterviewStage.APPROACH: "Please explain your approach to solving this problem.",
+            InterviewStage.CODING: "Go ahead and implement your solution.",
+            InterviewStage.OPTIMIZATION: "What's the time and space complexity of your solution?",
+            InterviewStage.BEHAVIORAL: "Let's discuss some behavioral questions.",
+            InterviewStage.WRAPUP: "We're coming to the end. Do you have any questions for me?",
+            InterviewStage.COMPLETED: "Thank you for your time today.",
+        }
+        return fallback_scripts.get(stage, "")
+    
+    def process_self_introduction(self, intro_text: str) -> str:
+        """
+        Process the user's self-introduction.
+        
+        Args:
+            intro_text: Transcribed text of user's self-introduction
+            
+        Returns:
+            Response message to show user
+        """
+        self.state.self_introduction = intro_text
+        self.state.self_intro_completed = True
+        
+        # Analyze the introduction
+        self._analyze_self_introduction(intro_text)
+        
+        # Add to conversation history
+        self.state.add_message("user", f"[Self Introduction] {intro_text}")
+        
+        # Generate response
+        if VOICE_AVAILABLE:
+            try:
+                from voice_engine import VOICE_SCRIPTS
+                response = VOICE_SCRIPTS.get("intro_followup", "Thank you for that introduction.")
+            except ImportError:
+                response = "Thank you for that introduction."
+        else:
+            response = "Thank you for that introduction."
+        
+        self.state.add_message("assistant", response)
+        
+        # Award communication points for self-intro
+        self.state.scores.communication = min(100, self.state.scores.communication + 10)
+        
+        return response
+    
+    def _analyze_self_introduction(self, intro: str):
+        """
+        Analyze self-introduction to personalize the interview.
+        Detects experience level and areas of expertise.
+        """
+        intro_lower = intro.lower()
+        
+        # Detect experience level
+        senior_keywords = ['senior', 'lead', 'architect', 'principal', 'staff', 
+                          '10 years', '8 years', '7 years', 'decade', 'manager']
+        junior_keywords = ['junior', 'intern', 'graduate', 'student', 'learning',
+                          'entry', 'fresher', 'new grad', 'bootcamp', '1 year']
+        
+        if any(kw in intro_lower for kw in senior_keywords):
+            self.state.detected_experience_level = "senior"
+            # Consider upgrading difficulty for senior candidates
+            if self.state.config.difficulty == InterviewDifficulty.MID:
+                self.state.config.difficulty = InterviewDifficulty.SENIOR
+        elif any(kw in intro_lower for kw in junior_keywords):
+            self.state.detected_experience_level = "junior"
+            # Consider downgrading difficulty for junior candidates
+            if self.state.config.difficulty == InterviewDifficulty.MID:
+                self.state.config.difficulty = InterviewDifficulty.JUNIOR
+        else:
+            self.state.detected_experience_level = "mid"
+        
+        # Detect areas of expertise for tailored follow-up questions
+        expertise_mapping = {
+            'web': ['web', 'frontend', 'backend', 'api', 'rest', 'react', 'angular', 'vue', 'django', 'flask'],
+            'data': ['data', 'analytics', 'machine learning', 'ml', 'ai', 'pandas', 'numpy', 'tensorflow'],
+            'automation': ['automation', 'testing', 'qa', 'selenium', 'robot', 'pytest', 'test'],
+            'devops': ['devops', 'cloud', 'aws', 'azure', 'kubernetes', 'docker', 'ci/cd', 'jenkins'],
+            'mobile': ['mobile', 'android', 'ios', 'flutter', 'react native', 'swift', 'kotlin'],
+            'systems': ['systems', 'linux', 'networking', 'infrastructure', 'sre', 'reliability'],
+        }
+        
+        detected_areas = []
+        for area, keywords in expertise_mapping.items():
+            if any(kw in intro_lower for kw in keywords):
+                detected_areas.append(area)
+        
+        self.state.detected_expertise_areas = detected_areas
+        
+        # Add detected areas to topics for context
+        self.state.topics_covered.extend(detected_areas)
+    
+    def complete_greeting(self):
+        """Mark the greeting stage as completed."""
+        self.state.greeting_completed = True
+    
+    def get_voice_feedback(self, response_text: str) -> Optional[bytes]:
+        """
+        Generate voice audio for an interview response.
+        
+        Args:
+            response_text: Text to convert to speech
+            
+        Returns:
+            Audio bytes or None if voice not enabled
+        """
+        if not self.is_voice_enabled() or not self.voice_interviewer:
+            return None
+        
+        return self.voice_interviewer.speak(response_text)
+    
+    # =========================================================================
+    # STANDARD INTERVIEW METHODS
+    # =========================================================================
     
     def start_new_interview(
         self,
@@ -250,7 +522,11 @@ class InterviewEngine:
         
         self.state.start_interview(problem, function_name)
         
-        return self._get_intro_message()
+        # Return appropriate opening based on mode
+        if self.state.voice_enabled:
+            return self._get_stage_voice_text(InterviewStage.GREETING)
+        else:
+            return self._get_intro_message()
     
     def _get_intro_message(self) -> str:
         """Generate the opening interview message."""
@@ -373,7 +649,11 @@ class InterviewEngine:
         """Generate response appropriate for the current interview stage."""
         stage = self.state.current_stage
         
-        if stage == InterviewStage.INTRO:
+        if stage == InterviewStage.GREETING:
+            return self._handle_greeting_stage(user_message)
+        elif stage == InterviewStage.SELF_INTRO:
+            return self._handle_self_intro_stage(user_message)
+        elif stage == InterviewStage.INTRO:
             return self._handle_intro_stage(user_message)
         elif stage == InterviewStage.APPROACH:
             return self._handle_approach_stage(user_message)
@@ -387,6 +667,24 @@ class InterviewEngine:
             return self._handle_wrapup_stage(user_message)
         else:
             return self._handle_completed_stage()
+    
+    def _handle_greeting_stage(self, message: str) -> str:
+        """Handle greeting stage (voice mode only)."""
+        # Greeting is typically auto-advanced after audio plays
+        # This handles any user response during greeting
+        self.state.greeting_completed = True
+        self.state.advance_stage()
+        return self._get_stage_voice_text(InterviewStage.SELF_INTRO)
+    
+    def _handle_self_intro_stage(self, message: str) -> str:
+        """Handle self-introduction stage (voice mode only)."""
+        # Process the self-introduction
+        if message and not self.state.self_intro_completed:
+            return self.process_self_introduction(message)
+        
+        # If already processed, move to intro
+        self.state.advance_stage()
+        return self._get_intro_message()
     
     def _handle_intro_stage(self, message: str) -> str:
         """Handle intro stage responses."""
@@ -710,4 +1008,3 @@ def create_interview_engine(
     
     state = InterviewState(config=config)
     return InterviewEngine(state)
-

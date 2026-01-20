@@ -26,6 +26,26 @@ from interview_engine import (
     create_interview_engine
 )
 
+# Import Voice Engine (optional)
+VOICE_AVAILABLE = False
+try:
+    from voice_engine import (
+        VoiceConfig, VoiceMode, VoiceInterviewer,
+        get_voice_capabilities, VOICE_SCRIPTS, TTSEngine,
+        get_audio_player_html
+    )
+    VOICE_AVAILABLE = True
+except ImportError:
+    pass
+
+# Audio recorder component (optional)
+AUDIO_RECORDER_AVAILABLE = False
+try:
+    from audio_recorder_streamlit import audio_recorder
+    AUDIO_RECORDER_AVAILABLE = True
+except ImportError:
+    pass
+
 # AI Services
 GROQ_AVAILABLE = bool(os.environ.get("GROQ_API_KEY"))
 
@@ -594,9 +614,12 @@ st.markdown("""
     box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
 }
 .chat-msg-ai { 
-    background: linear-gradient(135deg, rgba(191, 0, 255, 0.1), rgba(10, 20, 40, 0.9));
-    border: 1px solid rgba(191, 0, 255, 0.3); 
+    background: linear-gradient(135deg, rgba(0,245,255,0.06), rgba(10,20,40,0.92));
+    border: 1px solid rgba(0,245,255,0.15); 
     border-radius: 12px 12px 12px 4px;
+    color: #d0e4ed;
+    font-size: 15px;
+    line-height: 1.5;
 }
 
 /* ========== MODE TOGGLE ========== */
@@ -675,6 +698,18 @@ defaults = {
     "last_achievements": [],
     "new_achievement": None,
     "used_hint_this_problem": False,
+    # Voice mode state
+    "voice_mode_enabled": False,
+    "voice_config": None,
+    "current_audio": None,
+    "current_audio_bytes": None,  # Raw bytes for audio (persists across reruns)
+    "audio_playing": False,
+    "self_intro_text": "",
+    "self_intro_start_time": None,  # Track when self-intro timer started
+    "intro_audio_played": False,  # Track if intro request audio was played
+    "voice_greeting_done": False,
+    "voice_self_intro_done": False,
+    "waiting_for_voice": False,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -682,12 +717,14 @@ for k, v in defaults.items():
 
 # Interview stage metadata
 STAGE_INFO_LIST = [
-    ("intro", "01", "Introduction", "Read the problem & ask questions", "Clarify requirements, restate the problem, and ask if anything is missing."),
-    ("approach", "02", "Approach Discussion", "Explain your solution strategy", "Describe the algorithm, outline edge cases, and justify data choices."),
-    ("coding", "03", "Coding Time", "Write your solution code", "Translate your plan into readable Python and explain each section as you write."),
-    ("optimization", "04", "Optimization", "Analyze & improve complexity", "Evaluate time/space trade-offs and suggest refinements or alternate algorithms."),
-    ("behavioral", "05", "Behavioral", "Answer situational questions", "Use STAR stories, stay concise, and highlight communication skills."),
-    ("wrapup", "06", "Wrap Up", "Ask your questions", "Summarize your solution, thank the interviewer, and ask about next steps."),
+    ("greeting", "00", "Welcome", "Settle down for the interview", "Take a moment to get comfortable. The interviewer will introduce themselves."),
+    ("self_intro", "01", "Self Introduction", "Introduce yourself", "Share your background, experience, and what brings you here today."),
+    ("intro", "02", "Problem Introduction", "Read the problem & ask questions", "Clarify requirements, restate the problem, and ask if anything is missing."),
+    ("approach", "03", "Approach Discussion", "Explain your solution strategy", "Describe the algorithm, outline edge cases, and justify data choices."),
+    ("coding", "04", "Coding Time", "Write your solution code", "Translate your plan into readable Python and explain each section as you write."),
+    ("optimization", "05", "Optimization", "Analyze & improve complexity", "Evaluate time/space trade-offs and suggest refinements or alternate algorithms."),
+    ("behavioral", "06", "Behavioral", "Answer situational questions", "Use STAR stories, stay concise, and highlight communication skills."),
+    ("wrapup", "07", "Wrap Up", "Ask your questions", "Summarize your solution, thank the interviewer, and ask about next steps."),
 ]
 STAGE_INFO = {key: {"icon": icon, "title": title, "description": desc, "goal": goal} for key, icon, title, desc, goal in STAGE_INFO_LIST}
 STAGE_ORDER = [key for key, _, _, _, _ in STAGE_INFO_LIST]
@@ -879,12 +916,12 @@ def format_response_html(content: str) -> str:
     # Now escape HTML in the regular text
     formatted = escape_html_content(content)
     
-    # Restore code blocks with styling
+    # Restore code blocks with styling - no gap above, small gap below
     def replace_code_block(match):
         idx = int(match.group(1))
         code = escape_html_content(code_blocks[idx])
-        return f'''<div style="position:relative;margin:12px 0">
-            <div style="background:#0d1117;border:1px solid rgba(0,245,255,0.2);border-radius:8px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#e8f4f8;overflow-x:auto;white-space:pre-wrap;line-height:1.5">{code}</div>
+        return f'''<div style="position:relative;margin:2px 0 6px 0">
+            <div style="background:#0d1117;border:1px solid rgba(0,245,255,0.2);border-radius:8px;padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#e8f4f8;overflow-x:auto;white-space:pre-wrap;line-height:1.4">{code}</div>
         </div>'''
     
     formatted = re.sub(r'__CODE_BLOCK_(\d+)__', replace_code_block, formatted)
@@ -897,16 +934,26 @@ def format_response_html(content: str) -> str:
     
     formatted = re.sub(r'__INLINE_CODE_(\d+)__', replace_inline_code, formatted)
     
-    # Convert **bold** to styled spans
-    formatted = re.sub(r'\*\*([^*]+)\*\*', r'<strong style="color:#00ff88;font-weight:600">\1</strong>', formatted)
-    # Convert headers ## to styled divs
-    formatted = re.sub(r'^## (.+)$', r'<div style="color:#00f5ff;font-size:16px;font-weight:700;margin:16px 0 10px;font-family:Orbitron,sans-serif">\1</div>', formatted, flags=re.MULTILINE)
-    formatted = re.sub(r'^### (.+)$', r'<div style="color:#bf00ff;font-size:14px;font-weight:600;margin:12px 0 8px">\1</div>', formatted, flags=re.MULTILINE)
-    # Convert bullet points
-    formatted = re.sub(r'^- (.+)$', r'<div style="padding-left:16px;margin:4px 0;color:#e8f4f8">• \1</div>', formatted, flags=re.MULTILINE)
-    # Convert newlines to breaks
-    formatted = formatted.replace('\n\n', '<div style="height:12px"></div>')
+    # Convert **bold** to styled spans - clearer green color
+    formatted = re.sub(r'\*\*([^*]+)\*\*', r'<strong style="color:#00e67a;font-weight:600">\1</strong>', formatted)
+    
+    # Collapse multiple newlines into single newline first
+    formatted = re.sub(r'\n{3,}', '\n\n', formatted)
+    formatted = re.sub(r'\n\n', '\n', formatted)
+    
+    # Convert headers ## to styled divs - very compact
+    formatted = re.sub(r'^## (.+)$', r'<div style="color:#00d4ff;font-size:16px;font-weight:700;margin:6px 0 2px;font-family:Orbitron,sans-serif;letter-spacing:0.5px">\1</div>', formatted, flags=re.MULTILINE)
+    formatted = re.sub(r'^### (.+)$', r'<div style="color:#a855f7;font-size:15px;font-weight:600;margin:5px 0 2px">\1</div>', formatted, flags=re.MULTILINE)
+    # Convert bullet points - tight spacing
+    formatted = re.sub(r'^- (.+)$', r'<div style="padding-left:14px;margin:0;color:#d0e4ed;font-size:14px">• \1</div>', formatted, flags=re.MULTILINE)
+    # Convert checkmark lines (✓) - no extra margin, tight list
+    formatted = re.sub(r'^(✓.+)$', r'<div style="margin:0;padding:1px 0;color:#d0e4ed;font-size:14px">\1</div>', formatted, flags=re.MULTILINE)
+    # Convert remaining newlines to line breaks
     formatted = formatted.replace('\n', '<br>')
+    # Remove any double <br> that may have been created
+    formatted = re.sub(r'(<br>){2,}', '<br>', formatted)
+    # Remove <br> right after div tags (they already have block display)
+    formatted = re.sub(r'</div><br>', '</div>', formatted)
     return formatted
 
 @st.dialog("AI Chat Assistant", width="large")
@@ -954,10 +1001,10 @@ def show_chat_modal():
         font-size: 13px; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,255,136,0.2);
     }
     .chat-msg-ai {
-        background: linear-gradient(135deg, rgba(0,245,255,0.08), rgba(10,20,40,0.95));
-        border: 1px solid rgba(0,245,255,0.2); color: #e8f4f8;
-        padding: 14px 18px; border-radius: 16px 16px 16px 4px; margin: 8px 80px 8px 0;
-        font-size: 13px; line-height: 1.6; box-shadow: 0 4px 15px rgba(0,245,255,0.08);
+        background: linear-gradient(135deg, rgba(0,245,255,0.06), rgba(10,20,40,0.92));
+        border: 1px solid rgba(0,245,255,0.15); color: #d0e4ed;
+        padding: 16px 20px; border-radius: 16px 16px 16px 4px; margin: 8px 40px 8px 0;
+        font-size: 15px; line-height: 1.5; box-shadow: 0 4px 15px rgba(0,245,255,0.06);
     }
     .quick-btn {
         font-size: 11px !important; padding: 8px 12px !important; 
@@ -1281,6 +1328,52 @@ with c1:
                 </div>
                 </div>
                 """, unsafe_allow_html=True)
+            
+            # ========== VOICE MODE SELECTION ==========
+            st.markdown('<div class="section-title sec-cyan">INTERACTION MODE</div>', unsafe_allow_html=True)
+            
+            # Check voice capabilities
+            voice_caps = get_voice_capabilities() if VOICE_AVAILABLE else {"voice_mode_available": False}
+            
+            mode_cols = st.columns(2)
+            with mode_cols[0]:
+                text_btn_type = "primary" if not st.session_state.voice_mode_enabled else "secondary"
+                if st.button("💬 Text Mode", key="iv_mode_text", use_container_width=True, type=text_btn_type):
+                    st.session_state.voice_mode_enabled = False
+                    st.rerun()
+            
+            with mode_cols[1]:
+                if voice_caps.get("voice_mode_available", False):
+                    voice_btn_type = "primary" if st.session_state.voice_mode_enabled else "secondary"
+                    if st.button("🎙️ Voice Mode", key="iv_mode_voice", use_container_width=True, type=voice_btn_type):
+                        st.session_state.voice_mode_enabled = True
+                        st.rerun()
+                else:
+                    st.button("🎙️ Voice Mode", key="iv_mode_voice_disabled", use_container_width=True, disabled=True)
+                    st.caption("Install gTTS & SpeechRecognition")
+            
+            # Voice mode info
+            if st.session_state.voice_mode_enabled:
+                st.markdown("""
+                <div style="background:rgba(0,255,136,0.08);border:1px solid rgba(0,255,136,0.3);border-radius:10px;padding:12px;margin:10px 0">
+                    <div style="font-size:11px;color:#00ff88;font-weight:600;margin-bottom:6px">🎙️ VOICE MODE ENABLED</div>
+                    <div style="font-size:11px;color:#a3b8a0;line-height:1.5">
+                        • Interviewer will speak questions aloud<br>
+                        • You can respond by voice or text<br>
+                        • Includes self-introduction round<br>
+                        • More realistic interview experience
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.15);border-radius:10px;padding:12px;margin:10px 0">
+                    <div style="font-size:11px;color:#00f5ff;font-weight:600;margin-bottom:6px">💬 TEXT MODE</div>
+                    <div style="font-size:11px;color:#8fa3b8;line-height:1.5">
+                        Standard text-based interview with typing responses.
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         
             st.markdown('<div class="section-title sec-cyan">DIFFICULTY</div>', unsafe_allow_html=True)
             diff_map = {"Junior (Entry Level)": "junior", "Mid-Level (2-4 years)": "mid", "Senior (5+ years)": "senior"}
@@ -1303,12 +1396,35 @@ with c1:
             
             st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
             
-            if st.button("Start Interview", type="primary", use_container_width=True):
+            start_btn_text = "🎙️ Start Voice Interview" if st.session_state.voice_mode_enabled else "🚀 Start Interview"
+            if st.button(start_btn_text, type="primary", use_container_width=True):
                 engine = create_interview_engine(
                     difficulty=diff_map[diff],
                     interview_type=type_map[iv_type],
                     time_limit=time_limit
                 )
+                
+                # Enable voice mode if selected
+                if st.session_state.voice_mode_enabled and VOICE_AVAILABLE:
+                    voice_config = VoiceConfig(
+                        mode=VoiceMode.VOICE_ENABLED,
+                        tts_engine=TTSEngine.AUTO,
+                        listen_timeout=10,
+                        self_intro_duration=30,
+                        interviewer_tone="professional"
+                    )
+                    engine.enable_voice_mode(voice_config)
+                    st.session_state.voice_config = voice_config  # Store for later use
+                    st.session_state.voice_greeting_done = False
+                    st.session_state.voice_self_intro_done = False
+                    
+                    # Pre-generate greeting audio (store as raw bytes, not BytesIO)
+                    from voice_engine import TextToSpeech
+                    tts = TextToSpeech(engine=TTSEngine.AUTO)
+                    greeting_audio_bytes = tts.synthesize("Hi, please settle down for the interview.")
+                    if greeting_audio_bytes:
+                        st.session_state.current_audio_bytes = greeting_audio_bytes
+                
                 prob_idx = problem_names.index(selected_problem)
                 problem_data = available_problems[prob_idx][1]
                 intro_msg = engine.start_new_interview(
@@ -1322,6 +1438,12 @@ with c1:
                 st.session_state.interview_code = f"def {problem_data['function']}():\n    # Write your solution here\n    pass"
                 st.session_state.interview_feedback_shown = False
                 st.session_state.interview_problem = problem_data
+                
+                # Generate initial voice audio if voice mode
+                if engine.is_voice_enabled():
+                    text, audio = engine.get_voice_prompt()
+                    st.session_state.current_audio = audio
+                
                 st.rerun()
         
             # Interview History
@@ -1351,19 +1473,32 @@ with c1:
                     <div style="font-size:10px;color:#8fa3b8;margin-top:8px">{desc}</div>
                 </div>
                 ''', unsafe_allow_html=True)
-                stage_sequence = [
-                    ("intro", "Intro"),
-                    ("approach", "Approach"),
-                    ("coding", "Coding"),
-                    ("optimization", "Optimize"),
-                    ("behavioral", "Behavioral"),
-                    ("wrapup", "Wrap-up")
-                ]
+                # Build stage sequence based on voice mode
+                if engine.is_voice_enabled():
+                    stage_sequence = [
+                        ("greeting", "Welcome"),
+                        ("self_intro", "Intro"),
+                        ("intro", "Problem"),
+                        ("approach", "Approach"),
+                        ("coding", "Coding"),
+                        ("optimization", "Optimize"),
+                        ("wrapup", "Wrap-up")
+                    ]
+                else:
+                    stage_sequence = [
+                        ("intro", "Intro"),
+                        ("approach", "Approach"),
+                        ("coding", "Coding"),
+                        ("optimization", "Optimize"),
+                        ("behavioral", "Behavioral"),
+                        ("wrapup", "Wrap-up")
+                    ]
                 stage_markers = []
                 for key, label in stage_sequence:
                     active = key == current_stage
                     color = "#00f5ff" if active else "rgba(255,255,255,0.15)"
-                    stage_markers.append(f'<div style="flex:1;border-radius:8px;border:1px solid {color};background:{color};padding:6px 4px;font-size:10px;font-weight:600;color:#030508;text-align:center;letter-spacing:1px;margin:0 4px">{label}</div>')
+                    text_color = "#030508" if active else "#a3b8a0"
+                    stage_markers.append(f'<div style="flex:1;border-radius:8px;border:1px solid {color};background:{color if active else "transparent"};padding:6px 4px;font-size:9px;font-weight:600;color:{text_color};text-align:center;letter-spacing:1px;margin:0 2px">{label}</div>')
                 st.markdown(f'<div style="display:flex;margin-bottom:12px;">{"".join(stage_markers)}</div>', unsafe_allow_html=True)
                 
                 # Timer
@@ -1553,33 +1688,353 @@ with c2:
             current_stage = progress["current_stage"]
             stage_info = STAGE_INFO.get(current_stage, {"title": current_stage.title(), "goal": ""})
             
-            # Stage Header
-            st.markdown(f'''
-            <div style="text-align:center;font-weight:600;color:#f59e0b;padding:14px;margin-bottom:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);border-radius:14px;font-size:1rem;letter-spacing:0.5px">
-                {stage_info.get("title", current_stage.title())}
-            </div>
-            ''', unsafe_allow_html=True)
-            # Stage timeline
-            markers = []
-            for key in STAGE_ORDER:
-                info = STAGE_INFO[key]
-                active = key == current_stage
-                color = "#00f5ff" if active else "rgba(255,255,255,0.15)"
-                text_color = "#030508" if active else "#a3b8a0"
-                markers.append(f'<div style="flex:1;padding:6px 4px;margin:0 4px;border-radius:8px;border:1px solid {color};background:{color};font-size:11px;font-weight:600;color:{text_color};text-align:center;letter-spacing:1px">{info["title"]}</div>')
-            st.markdown(f'<div style="display:flex;margin-bottom:12px;">{"".join(markers)}</div>', unsafe_allow_html=True)
-            goal = stage_info.get("goal", "")
-            if goal:
-                st.markdown(f'<div style="font-size:12px;color:#6b8068;margin-bottom:10px;line-height:1.6">{goal}</div>', unsafe_allow_html=True)
+            # ========== GREETING STAGE (Voice Mode Only) ==========
+            # Check if this is a voice mode interview at greeting stage
+            is_voice_interview = engine.state.voice_enabled and current_stage == "greeting"
             
-            # Problem Statement (Always Visible)
-            if problem:
+            if is_voice_interview:
+                # Re-initialize voice interviewer if needed (doesn't persist across reruns)
+                if engine.voice_interviewer is None and VOICE_AVAILABLE:
+                    voice_config = st.session_state.get("voice_config")
+                    if voice_config is None:
+                        voice_config = VoiceConfig(
+                            mode=VoiceMode.VOICE_ENABLED,
+                            tts_engine=TTSEngine.AUTO
+                        )
+                    engine.voice_interviewer = VoiceInterviewer(voice_config)
+                
+                st.markdown("""
+                <div style="text-align:center;padding:40px 20px">
+                    <div style="font-size:4rem;margin-bottom:20px">👋</div>
+                    <div style="font-size:1.5rem;color:#fff;font-weight:600;margin-bottom:12px">Welcome to Your Interview</div>
+                    <div style="font-size:14px;color:#8fa3b8;margin-bottom:20px">Please settle down and get comfortable...</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Generate greeting audio if not already generated
+                if st.session_state.current_audio_bytes is None:
+                    if VOICE_AVAILABLE:
+                        from voice_engine import TextToSpeech
+                        tts = TextToSpeech(engine=TTSEngine.AUTO)
+                        greeting_text = "Hi, please settle down for the interview."
+                        audio_bytes = tts.synthesize(greeting_text)
+                        if audio_bytes:
+                            st.session_state.current_audio_bytes = audio_bytes
+                
+                # Show the interviewer message and audio
+                st.markdown("""
+                <div style="background:rgba(191,0,255,0.15);border:2px solid rgba(191,0,255,0.5);border-radius:16px;padding:20px;margin:20px 0;text-align:center;box-shadow:0 0 20px rgba(191,0,255,0.2)">
+                    <div style="font-size:14px;color:#bf00ff;font-weight:700;margin-bottom:12px">🔊 INTERVIEWER SAYS:</div>
+                    <div style="font-size:18px;color:#fff;font-style:italic;margin-bottom:16px;line-height:1.5">"Hi, please settle down for the interview."</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Play the greeting audio using HTML5 audio with base64 (AUTOPLAY)
+                if st.session_state.current_audio_bytes:
+                    import base64
+                    audio_b64 = base64.b64encode(st.session_state.current_audio_bytes).decode()
+                    audio_html = f'''
+                    <div style="display:flex;justify-content:center;margin:16px 0;">
+                        <audio id="greeting-audio" controls autoplay style="width:100%;max-width:400px;">
+                            <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+                        </audio>
+                    </div>
+                    <script>
+                        var audio = document.getElementById('greeting-audio');
+                        if (audio) {{ audio.play().catch(function(e) {{}}); }}
+                    </script>
+                    '''
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                
+                # Show countdown and auto-advance
+                st.markdown("""
+                <div style="text-align:center;margin:20px 0;padding:20px;background:rgba(0,245,255,0.1);border-radius:12px;">
+                    <div style="font-size:14px;color:#00f5ff;margin-bottom:8px">⏳ Moving to Self Introduction in...</div>
+                    <div id="countdown" style="font-size:2.5rem;font-weight:bold;color:#00f5ff;">3</div>
+                </div>
+                <script>
+                    var count = 3;
+                    var countdownEl = document.getElementById('countdown');
+                    var interval = setInterval(function() {
+                        count--;
+                        if (countdownEl) countdownEl.innerText = count;
+                        if (count <= 0) {
+                            clearInterval(interval);
+                            // Trigger Streamlit rerun by clicking hidden button
+                            var btn = document.getElementById('auto-continue-btn');
+                            if (btn) btn.click();
+                        }
+                    }, 1000);
+                </script>
+                """, unsafe_allow_html=True)
+                
+                # Hidden button for auto-continue (triggered by JavaScript)
+                if st.button("Continue", key="auto_continue_greeting", type="secondary"):
+                    engine.complete_greeting()
+                    engine.state.advance_stage()
+                    # Generate audio for self-intro request
+                    if VOICE_AVAILABLE:
+                        from voice_engine import TextToSpeech
+                        tts = TextToSpeech(engine=TTSEngine.AUTO)
+                        intro_text = "Please introduce yourself. You have 10 seconds."
+                        audio_bytes = tts.synthesize(intro_text)
+                        if audio_bytes:
+                            st.session_state.current_audio_bytes = audio_bytes
+                    st.session_state.voice_greeting_done = True
+                    st.session_state.self_intro_start_time = time.time()
+                    st.rerun()
+                
+                # Add hidden button for JS to click
+                st.markdown('<button id="auto-continue-btn" onclick="document.querySelector(\'[data-testid=stButton] button\').click()" style="display:none;"></button>', unsafe_allow_html=True)
+            
+            # ========== SELF-INTRODUCTION STAGE (Voice Mode Only) ==========
+            elif current_stage == "self_intro" and engine.state.voice_enabled:
+                
+                # Generate and play "introduce yourself" audio if not done
+                if st.session_state.current_audio_bytes is None and not st.session_state.get("intro_audio_played"):
+                    if VOICE_AVAILABLE:
+                        from voice_engine import TextToSpeech
+                        tts = TextToSpeech(engine=TTSEngine.AUTO)
+                        intro_audio = tts.synthesize("Now, please introduce yourself. You have 10 seconds.")
+                        if intro_audio:
+                            st.session_state.current_audio_bytes = intro_audio
+                
+                st.markdown("""
+                <div style="text-align:center;padding:15px">
+                    <div style="font-size:3rem;margin-bottom:8px">🎤</div>
+                    <div style="font-size:1.3rem;color:#00f5ff;font-weight:600;">Your Turn to Speak!</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show the interviewer's request with audio
+                st.markdown("""
+                <div style="background:rgba(191,0,255,0.15);border:2px solid rgba(191,0,255,0.5);border-radius:16px;padding:16px;margin:10px 0;text-align:center;">
+                    <div style="font-size:13px;color:#bf00ff;font-weight:700;margin-bottom:8px">🔊 INTERVIEWER:</div>
+                    <div style="font-size:16px;color:#fff;font-style:italic;">"Now, please introduce yourself. You have 10 seconds."</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Play the interviewer's request audio (AUTOPLAY)
+                if st.session_state.current_audio_bytes:
+                    import base64
+                    audio_b64 = base64.b64encode(st.session_state.current_audio_bytes).decode()
+                    st.markdown(f'''
+                    <div style="display:flex;justify-content:center;margin:12px 0;">
+                        <audio id="intro-request-audio" controls autoplay style="width:100%;max-width:350px;">
+                            <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+                        </audio>
+                    </div>
+                    <script>
+                        var audio = document.getElementById('intro-request-audio');
+                        if (audio) {{ audio.play().catch(function(e) {{}}); }}
+                    </script>
+                    ''', unsafe_allow_html=True)
+                    st.session_state.current_audio_bytes = None
+                    st.session_state.intro_audio_played = True
+                
+                # Web Speech API for automatic listening
+                st.markdown("""
+                <div style="text-align:center;margin:20px 0;padding:25px;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,255,0.1));border:2px solid rgba(0,255,136,0.5);border-radius:16px;">
+                    <div style="font-size:14px;color:#00ff88;margin-bottom:8px;font-weight:600;">⏱️ LISTENING... (10 seconds)</div>
+                    <div id="countdown-display" style="font-size:3.5rem;font-weight:900;color:#00ff88;text-shadow:0 0 20px rgba(0,255,136,0.5);">10</div>
+                    <div id="listening-status" style="font-size:14px;color:#fff;margin-top:12px;">🎤 Speak now! Say your introduction...</div>
+                    <div id="transcript-display" style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;min-height:60px;text-align:left;">
+                        <span style="color:#8fa3b8;font-style:italic;">Your words will appear here...</span>
+                    </div>
+                </div>
+                
+                <script>
+                // Web Speech API for automatic speech recognition
+                var finalTranscript = '';
+                var recognition = null;
+                var timeLeft = 10;
+                
+                // Check if browser supports Web Speech API
+                if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    recognition = new SpeechRecognition();
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.lang = 'en-US';
+                    
+                    recognition.onresult = function(event) {
+                        var interimTranscript = '';
+                        for (var i = event.resultIndex; i < event.results.length; i++) {
+                            if (event.results[i].isFinal) {
+                                finalTranscript += event.results[i][0].transcript + ' ';
+                            } else {
+                                interimTranscript += event.results[i][0].transcript;
+                            }
+                        }
+                        var display = document.getElementById('transcript-display');
+                        if (display) {
+                            display.innerHTML = '<span style="color:#00ff88;">' + finalTranscript + '</span><span style="color:#8fa3b8;">' + interimTranscript + '</span>';
+                        }
+                    };
+                    
+                    recognition.onerror = function(event) {
+                        console.log('Speech recognition error:', event.error);
+                        var status = document.getElementById('listening-status');
+                        if (status && event.error === 'not-allowed') {
+                            status.innerHTML = '⚠️ Please allow microphone access and refresh';
+                        }
+                    };
+                    
+                    recognition.onend = function() {
+                        // Store transcript for Streamlit
+                        if (finalTranscript.trim()) {
+                            // Create hidden input to pass transcript
+                            var input = document.getElementById('speech-transcript-input');
+                            if (input) {
+                                input.value = finalTranscript.trim();
+                            }
+                        }
+                    };
+                    
+                    // Start listening after a short delay (for audio to finish)
+                    setTimeout(function() {
+                        try {
+                            recognition.start();
+                            document.getElementById('listening-status').innerHTML = '🔴 LISTENING... Speak now!';
+                        } catch(e) {
+                            console.log('Could not start recognition:', e);
+                        }
+                    }, 2000);
+                    
+                    // Countdown timer
+                    var countdownInterval = setInterval(function() {
+                        timeLeft--;
+                        var countdownEl = document.getElementById('countdown-display');
+                        if (countdownEl) {
+                            countdownEl.innerText = timeLeft;
+                            if (timeLeft <= 3) {
+                                countdownEl.style.color = '#ff6b6b';
+                            }
+                        }
+                        if (timeLeft <= 0) {
+                            clearInterval(countdownInterval);
+                            if (recognition) recognition.stop();
+                            document.getElementById('listening-status').innerHTML = "✅ Time's up! Processing...";
+                            document.getElementById('countdown-display').innerText = "Done!";
+                            // Click submit button
+                            setTimeout(function() {
+                                var btn = document.querySelector('[data-testid="stButton"] button');
+                                if (btn && finalTranscript.trim()) {
+                                    document.getElementById('speech-transcript-input').value = finalTranscript.trim();
+                                    btn.click();
+                                }
+                            }, 500);
+                        }
+                    }, 1000);
+                } else {
+                    document.getElementById('listening-status').innerHTML = '⚠️ Browser does not support speech recognition. Please type below.';
+                }
+                </script>
+                
+                <input type="hidden" id="speech-transcript-input" value="">
+                """, unsafe_allow_html=True)
+                
+                # Text input for transcript (hidden, populated by JS)
+                transcript_input = st.text_input("Speech transcript:", key="voice_transcript", label_visibility="collapsed")
+                
+                # Submit button (can be clicked by JS or manually)
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    manual_intro = st.text_area("Or type your introduction:", height=70, key="manual_intro_input",
+                                                placeholder="Hi, I'm [name]. I have experience in...")
+                with col2:
+                    st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
+                    submit_clicked = st.button("📤 Submit", type="primary", use_container_width=True, key="submit_intro_btn")
+                
+                # Process submission
+                if submit_clicked:
+                    # Get transcript from JS or manual input
+                    intro_text = transcript_input or manual_intro or ""
+                    
+                    if intro_text.strip():
+                        st.session_state.self_intro_text = intro_text.strip()
+                        engine.process_self_introduction(intro_text.strip())
+                        engine.state.advance_stage()
+                        
+                        # Generate response audio
+                        if VOICE_AVAILABLE:
+                            from voice_engine import TextToSpeech
+                            tts = TextToSpeech(engine=TTSEngine.AUTO)
+                            response_audio = tts.synthesize("Thank you for that introduction. Let's proceed with the technical portion.")
+                            if response_audio:
+                                st.session_state.current_audio_bytes = response_audio
+                        
+                        st.session_state.voice_self_intro_done = True
+                        st.session_state.intro_audio_played = False
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ No introduction detected. Please speak or type your introduction.")
+            
+            # ========== REGULAR INTERVIEW STAGES ==========
+            else:
+                # Play voice audio if available (for voice mode during regular stages) - AUTOPLAY
+                if engine.state.voice_enabled and st.session_state.current_audio_bytes:
+                    import base64
+                    st.markdown("""
+                    <div style="background:rgba(191,0,255,0.12);border:1px solid rgba(191,0,255,0.4);border-radius:12px;padding:12px;margin-bottom:16px;text-align:center">
+                        <div style="font-size:12px;color:#bf00ff;font-weight:700;margin-bottom:8px">🔊 INTERVIEWER SPEAKING...</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    audio_b64 = base64.b64encode(st.session_state.current_audio_bytes).decode()
+                    audio_html = f'''
+                    <div style="display:flex;justify-content:center;margin:8px 0 16px 0;">
+                        <audio id="stage-audio" controls autoplay style="width:100%;max-width:400px;">
+                            <source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3">
+                        </audio>
+                    </div>
+                    <script>
+                        var audio = document.getElementById('stage-audio');
+                        if (audio) {{
+                            audio.play().catch(function(e) {{ console.log('Autoplay blocked'); }});
+                        }}
+                    </script>
+                    '''
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                    st.session_state.current_audio_bytes = None  # Clear after showing
+                
+                # Stage Header
                 st.markdown(f'''
-                <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:12px;padding:14px;margin-bottom:12px">
-                    <div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Problem</div>
-                    <div style="font-size:13px;font-weight:500;color:#f5f5f0;line-height:1.5">{problem.get("question", "")}</div>
-        </div>
+                <div style="text-align:center;font-weight:600;color:#f59e0b;padding:14px;margin-bottom:12px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.15);border-radius:14px;font-size:1rem;letter-spacing:0.5px">
+                    {stage_info.get("title", current_stage.title())}
+                </div>
                 ''', unsafe_allow_html=True)
+                
+                # Stage timeline (only for non-voice stages)
+                if engine.is_voice_enabled():
+                    stage_keys = ["intro", "approach", "coding", "optimization", "wrapup"]
+                else:
+                    stage_keys = STAGE_ORDER
+                    
+                markers = []
+                for key in stage_keys:
+                    if key in STAGE_INFO:
+                        info = STAGE_INFO[key]
+                        active = key == current_stage
+                        color = "#00f5ff" if active else "rgba(255,255,255,0.15)"
+                        text_color = "#030508" if active else "#a3b8a0"
+                        bg_color = color if active else "transparent"
+                        markers.append(f'<div style="flex:1;padding:6px 4px;margin:0 2px;border-radius:8px;border:1px solid {color};background:{bg_color};font-size:10px;font-weight:600;color:{text_color};text-align:center;letter-spacing:1px">{info["title"]}</div>')
+                
+                if markers:
+                    st.markdown(f'<div style="display:flex;margin-bottom:12px;">{"".join(markers)}</div>', unsafe_allow_html=True)
+                
+                goal = stage_info.get("goal", "")
+                if goal:
+                    st.markdown(f'<div style="font-size:12px;color:#6b8068;margin-bottom:10px;line-height:1.6">{goal}</div>', unsafe_allow_html=True)
+                
+                # Problem Statement (Always Visible)
+                if problem:
+                    st.markdown(f'''
+                    <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:12px;padding:14px;margin-bottom:12px">
+                        <div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Problem</div>
+                        <div style="font-size:13px;font-weight:500;color:#f5f5f0;line-height:1.5">{problem.get("question", "")}</div>
+                    </div>
+                    ''', unsafe_allow_html=True)
             
             # Conversation Area (Larger)
             st.markdown('<div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin:10px 0 6px">Conversation</div>', unsafe_allow_html=True)
@@ -1636,7 +2091,13 @@ with c2:
                     with qr_cols[i % 2]:
                         if st.button(qr[:25] + ("..." if len(qr) > 25 else ""), key=f"qr_{i}", use_container_width=True):
                             code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
-                            engine.process_response(qr, code)
+                            response = engine.process_response(qr, code)
+                            
+                            # Generate voice for response if voice mode enabled
+                            if engine.is_voice_enabled():
+                                audio = engine.get_voice_feedback(response)
+                                st.session_state.current_audio = audio
+                            
                             if engine.state.current_stage == InterviewStage.COMPLETED:
                                 st.session_state.interview_feedback_shown = True
                             st.rerun()
@@ -1644,22 +2105,85 @@ with c2:
             # Custom Input
             st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
             placeholder_text = stage_info.get("goal", "Type your response or use quick buttons above...")
-            iv_input = st.text_input("Your response", placeholder=placeholder_text, key="iv_input", label_visibility="collapsed")
             
-            send_col, end_col = st.columns([4, 1])
-            with send_col:
-                if st.button("Send Response", type="primary", use_container_width=True, key="iv_send"):
-                    if iv_input:
-                        code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
-                        engine.process_response(iv_input, code)
-                        if engine.state.current_stage == InterviewStage.COMPLETED:
-                            st.session_state.interview_feedback_shown = True
-                        st.rerun()
-            with end_col:
-                if st.button("X", key="iv_end", help="End Interview"):
+            # Voice mode input with voice recording option
+            if engine.is_voice_enabled() and AUDIO_RECORDER_AVAILABLE:
+                input_cols = st.columns([5, 1, 1])
+                
+                with input_cols[0]:
+                    iv_input = st.text_input("Your response", placeholder="Type or use voice...", key="iv_input", label_visibility="collapsed")
+                
+                with input_cols[1]:
+                    # Voice record button
+                    voice_audio = audio_recorder(
+                        text="",
+                        recording_color="#00ff88",
+                        neutral_color="#00f5ff",
+                        icon_size="lg",
+                        key="voice_response_recorder"
+                    )
+                
+                with input_cols[2]:
+                    send_clicked = st.button("📤", type="primary", key="iv_send", help="Send response")
+                
+                # Process voice input if recorded
+                if voice_audio:
+                    with st.spinner("Processing voice..."):
+                        if engine.voice_interviewer and engine.voice_interviewer.stt.is_available():
+                            success, transcript = engine.voice_interviewer.stt.transcribe_audio_bytes(voice_audio)
+                            if success:
+                                code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
+                                response = engine.process_response(transcript, code)
+                                
+                                # Generate voice for response
+                                if engine.is_voice_enabled():
+                                    audio = engine.get_voice_feedback(response)
+                                    st.session_state.current_audio = audio
+                                
+                                if engine.state.current_stage == InterviewStage.COMPLETED:
+                                    st.session_state.interview_feedback_shown = True
+                                st.rerun()
+                            else:
+                                st.error(f"Could not understand: {transcript}")
+                
+                # Process text input
+                if send_clicked and iv_input:
+                    code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
+                    response = engine.process_response(iv_input, code)
+                    
+                    # Generate voice for response
+                    if engine.is_voice_enabled():
+                        audio = engine.get_voice_feedback(response)
+                        st.session_state.current_audio = audio
+                    
+                    if engine.state.current_stage == InterviewStage.COMPLETED:
+                        st.session_state.interview_feedback_shown = True
+                    st.rerun()
+                
+                # End interview button (separate row)
+                if st.button("End Interview", key="iv_end", type="secondary", use_container_width=True):
                     engine.force_end_interview()
                     st.session_state.interview_feedback_shown = True
                     st.rerun()
+            
+            else:
+                # Standard text-only input
+                iv_input = st.text_input("Your response", placeholder=placeholder_text, key="iv_input", label_visibility="collapsed")
+                
+                send_col, end_col = st.columns([4, 1])
+                with send_col:
+                    if st.button("Send Response", type="primary", use_container_width=True, key="iv_send"):
+                        if iv_input:
+                            code = st.session_state.interview_code if current_stage in ["coding", "optimization", "approach"] else ""
+                            engine.process_response(iv_input, code)
+                            if engine.state.current_stage == InterviewStage.COMPLETED:
+                                st.session_state.interview_feedback_shown = True
+                            st.rerun()
+                with end_col:
+                    if st.button("X", key="iv_end", help="End Interview"):
+                        engine.force_end_interview()
+                        st.session_state.interview_feedback_shown = True
+                        st.rerun()
         
             # Auto-end on time up
             if progress["is_time_up"] and not st.session_state.interview_feedback_shown:

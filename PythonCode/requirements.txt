@@ -30,6 +30,29 @@ faiss-cpu>=1.7.4
 numpy>=1.24.0
 
 # =============================================================================
+# Voice Features (Optional - for Voice Interview Mode)
+# =============================================================================
+
+# Text-to-Speech - Google TTS (requires internet)
+gTTS>=2.5.0
+
+# Text-to-Speech - Offline alternative
+pyttsx3>=2.90
+
+# Speech-to-Text - Speech recognition library
+SpeechRecognition>=3.10.0
+
+# Audio recorder component for Streamlit (browser-based, no system deps needed)
+audio-recorder-streamlit>=0.0.8
+
+# Audio processing
+pydub>=0.25.1
+
+# Note: PyAudio is NOT required! We use browser-based audio recording via 
+# audio-recorder-streamlit, which works without any system dependencies.
+# Speech recognition uses Google's web API for transcription.
+
+# =============================================================================
 # Testing
 # =============================================================================
 

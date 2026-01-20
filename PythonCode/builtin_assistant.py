@@ -6664,7 +6664,7 @@ def generate_response(
                     flags=re.IGNORECASE
                 )
             user_message = corrected_message
-            msg_lower = user_message.lower().strip()
+    msg_lower = user_message.lower().strip()
     
     # Interview mode - act like a technical interviewer
     if interview_mode:
