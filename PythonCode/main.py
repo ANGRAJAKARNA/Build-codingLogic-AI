@@ -710,6 +710,9 @@ defaults = {
     "voice_greeting_done": False,
     "voice_self_intro_done": False,
     "waiting_for_voice": False,
+    # Feedback correction state
+    "show_correction_input": False,
+    "correction_context": None,  # Store question/answer for correction
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -1045,7 +1048,10 @@ def show_chat_modal():
         st.session_state.code_output = None
     
     # ========== HEADER BAR ==========
-    stats = get_learning_stats()
+    # Use cached stats to avoid delay
+    if "chat_stats_cache" not in st.session_state:
+        st.session_state.chat_stats_cache = get_learning_stats()
+    stats = st.session_state.chat_stats_cache
     total_qas = stats.get("total_interactions", 0)
     
     # Header with topic tabs and actions
@@ -1143,8 +1149,57 @@ def show_chat_modal():
                         st.toast("Thanks! 🧠")
                 with c2:
                     if st.button("👎", key="fb_down", help="Improve"):
-                        record_feedback(st.session_state.last_user_msg or "", last_ai, False)
-                        st.toast("Noted! 📝")
+                        # Show correction input instead of immediately recording
+                        st.session_state.show_correction_input = True
+                        st.session_state.correction_context = {
+                            "question": st.session_state.last_user_msg or "",
+                            "answer": last_ai
+                        }
+                        st.rerun()
+                
+                # ========== CORRECTION INPUT FORM ==========
+                if st.session_state.show_correction_input and st.session_state.correction_context:
+                    st.markdown("""
+                    <div style="background:linear-gradient(135deg, rgba(255,100,100,0.15), rgba(255,50,50,0.08));
+                                border:1px solid rgba(255,100,100,0.4);border-radius:12px;padding:16px;margin-top:12px">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+                            <span style="font-size:18px">✏️</span>
+                            <span style="font-size:13px;font-weight:600;color:#ff6b6b">Help us improve!</span>
+                        </div>
+                        <div style="font-size:11px;color:#8fa3b8;margin-bottom:10px">
+                            What would be the correct answer? (Optional)
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    correction_text = st.text_area(
+                        "Your correction:",
+                        placeholder="Type the correct answer here...",
+                        height=100,
+                        key="correction_input",
+                        label_visibility="collapsed"
+                    )
+                    
+                    btn_col1, btn_col2 = st.columns(2)
+                    with btn_col1:
+                        if st.button("📤 Submit", key="submit_correction", use_container_width=True, type="primary"):
+                            ctx = st.session_state.correction_context
+                            record_feedback(ctx["question"], ctx["answer"], False, correction_text if correction_text.strip() else None)
+                            st.session_state.show_correction_input = False
+                            st.session_state.correction_context = None
+                            if correction_text.strip():
+                                st.toast("Thanks for the correction! 🙏")
+                            else:
+                                st.toast("Feedback noted! 📝")
+                            st.rerun()
+                    with btn_col2:
+                        if st.button("⏭️ Skip", key="skip_correction", use_container_width=True):
+                            ctx = st.session_state.correction_context
+                            record_feedback(ctx["question"], ctx["answer"], False)
+                            st.session_state.show_correction_input = False
+                            st.session_state.correction_context = None
+                            st.toast("Noted! 📝")
+                            st.rerun()
     
     # ========== MAIN CHAT AREA ==========
     with main_cols[1]:
@@ -1223,6 +1278,21 @@ def show_chat_modal():
                 st.session_state.reopen_chat = True
                 st.rerun()
 
+
+# ==================== PRE-INITIALIZE LEARNING MODULES ====================
+# This prevents delay when opening AI Chat for the first time
+@st.cache_resource
+def _preload_learning_modules():
+    """Pre-load learning modules at startup to avoid delay when opening chat."""
+    try:
+        # Initialize learning stats (triggers module loading)
+        stats = get_learning_stats()
+        return stats.get("available", False)
+    except Exception:
+        return False
+
+# Trigger pre-loading (happens once at app start)
+_preload_learning_modules()
 
 # ==================== HEADER ====================
 header_cols = st.columns([1, 4, 1])
