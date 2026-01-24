@@ -1,0 +1,63 @@
+{
+  "user_preferences": {},
+  "past_qa": [
+    {
+      "q": "Bash scripting",
+      "a": "## 📜 Bash Shell Scripting\n\n**Definition:** Bash scripting allows automating tasks by writing sequences of commands in executable files.\n\nSee `bash_scripting` for the complete guide with examples.",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T10:53:22.735506"
+    },
+    {
+      "q": "Bash scripting",
+      "a": "## 📜 Bash Shell Scripting\n\n**Definition:** Bash scripting allows automating tasks by writing sequences of commands in executable files.\n\nSee `bash_scripting` for the complete guide with examples.",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T18:40:03.275593"
+    },
+    {
+      "q": "what is python",
+      "a": "## 🐍 What is Python?\n\n**Definition:** Python is a high-level, interpreted, general-purpose programming language created by Guido van Rossum.\n\n### History of Python\n| Year | Milestone |\n|------|-----------|\n| **1989** | Guido van Rossum started Python as a hobby project |\n| **1991** | Python 0.9.0 released (had classes, functions, exception handling) |\n| **1994** | Python 1.0 released (lambda, map, filter, reduce) |\n| **2000** | Python 2.0 released (list comprehensions, garbage collection) |\n| **",
+      "topic": null,
+      "rating": null,
+      "timestamp": "2026-01-24T20:44:26.146713"
+    },
+    {
+      "q": "Bash scripting",
+      "a": "## 📜 Bash Shell Scripting\n\n**Definition:** Bash scripting allows automating tasks by writing sequences of commands in executable files.\n\nSee `bash_scripting` for the complete guide with examples.",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T20:44:37.359747"
+    },
+    {
+      "q": "Bash scripting",
+      "a": "📝 *From your correction* 🟡\n\nDefinition: Bash scripting allows automating tasks by writing sequences of commands in executable files.\nSee bash_scripting for the complete guide with examples.\n\n1.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, you are usually using bash.\n\n2.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, yo",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T20:48:05.080432"
+    },
+    {
+      "q": "Bash scripting",
+      "a": "📝 *From your correction* 🟡\n\nDefinition: Bash scripting allows automating tasks by writing sequences of commands in executable files.\nSee bash_scripting for the complete guide with examples.\n\n1.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, you are usually using bash.\n\n2.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, yo",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T21:18:17.546630"
+    }
+  ],
+  "learned_facts": [],
+  "session_count": 0,
+  "topics_asked": {
+    "networking": 5
+  },
+  "last_session": null,
+  "user_profile": {
+    "skill_level": "unknown",
+    "interests": [
+      "networking"
+    ],
+    "response_preference": "detailed",
+    "questions_count": 3,
+    "correct_answers": 0,
+    "topics_mastered": []
+  }
+}

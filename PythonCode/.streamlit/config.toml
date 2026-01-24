@@ -1,0 +1,38 @@
+# Streamlit Configuration
+# This file configures your Streamlit app settings
+
+[server]
+# Port (Streamlit Cloud will override this)
+port = 8501
+
+# Enable CORS (Cross-Origin Resource Sharing)
+enableCORS = false
+
+# Enable XSRF protection
+enableXsrfProtection = true
+
+# Maximum upload size (in MB)
+maxUploadSize = 200
+
+# Maximum message size (in MB)
+maxMessageSize = 200
+
+# Run on save (for development - disabled in production)
+runOnSave = false
+
+[browser]
+# Automatically open browser (disabled in cloud)
+gatherUsageStats = false
+
+[theme]
+# Match your app's neon cyber theme
+primaryColor = "#00f5ff"
+backgroundColor = "#0a0f1a"
+secondaryBackgroundColor = "#0a1428"
+textColor = "#e8f4f8"
+font = "sans serif"
+
+[ui]
+# Hide the hamburger menu (you already do this in CSS)
+hideTopBar = false
+hideSidebarNav = false

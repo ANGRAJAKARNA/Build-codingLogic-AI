@@ -1,0 +1,25 @@
+{
+  "good_responses": {},
+  "bad_responses": {
+    "networking": [
+      {
+        "q": "Bash scripting",
+        "a": "## 📜 Bash Shell Scripting\n\n**Definition:** Bash scripting allows automating tasks by writing sequences of commands in executable files.\n\nSee `bash_scripting` for the complete guide with examples.",
+        "timestamp": "2026-01-24T20:47:54.378969"
+      }
+    ]
+  },
+  "corrections": [
+    {
+      "original_q": "Bash scripting",
+      "original_a": "## 📜 Bash Shell Scripting\n\n**Definition:** Bash scripting allows automating tasks by writing sequences of commands in executable files.\n\nSee `bash_scripting` for the complete guide with examples.",
+      "corrected_a": "Definition: Bash scripting allows automating tasks by writing sequences of commands in executable files.\nSee bash_scripting for the complete guide with examples.\n\n1.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, you are usually using bash.\n\n2.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, you are usually using bash.\n\n3.What is Bash Shell Scripting?\n\nBash Shell Scripting is the process of writing a file that contains multiple Linux commands, which are executed line by line automatically.\n\nInstead of typing commands one by one, you automate them.\n\nWhat is a Bash Script File?\n\nA text file\n\nExtension usually: .sh\n\nContains Linux commands + logic\n\nexample:-\nhello.sh\n",
+      "topic": "networking",
+      "timestamp": "2026-01-24T20:47:54.378969"
+    }
+  ],
+  "feedback_count": {
+    "positive": 0,
+    "negative": 1
+  }
+}

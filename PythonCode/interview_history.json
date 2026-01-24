@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-01-24T20:54:02.038135",
+  "interviews": [
+    {
+      "topic": "Check if number is palindrome",
+      "scores": {
+        "problem_solving": 0.0,
+        "communication": 0.0,
+        "code_quality": 0.0,
+        "complexity_analysis": 0.0,
+        "total": 0.0
+      },
+      "grade": "F",
+      "recommendation": "No Hire",
+      "difficulty": "mid",
+      "interview_type": "technical",
+      "duration_seconds": 25,
+      "timestamp": "2026-01-24T20:53:56.649740"
+    },
+    {
+      "topic": "Check if number is palindrome",
+      "scores": {
+        "problem_solving": 0.0,
+        "communication": 0.0,
+        "code_quality": 0.0,
+        "complexity_analysis": 0.0,
+        "total": 0.0
+      },
+      "grade": "F",
+      "recommendation": "No Hire",
+      "difficulty": "mid",
+      "interview_type": "technical",
+      "duration_seconds": 29,
+      "timestamp": "2026-01-24T20:54:00.337300"
+    },
+    {
+      "topic": "Check if number is palindrome",
+      "scores": {
+        "problem_solving": 0.0,
+        "communication": 0.0,
+        "code_quality": 0.0,
+        "complexity_analysis": 0.0,
+        "total": 0.0
+      },
+      "grade": "F",
+      "recommendation": "No Hire",
+      "difficulty": "mid",
+      "interview_type": "technical",
+      "duration_seconds": 31,
+      "timestamp": "2026-01-24T20:54:02.036121"
+    }
+  ]
+}
