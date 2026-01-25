@@ -42,12 +42,27 @@
       "topic": "networking",
       "rating": null,
       "timestamp": "2026-01-24T21:18:17.546630"
+    },
+    {
+      "q": "Bash scripting",
+      "a": "📝 *From your correction* 🟡\n\nDefinition: Bash scripting allows automating tasks by writing sequences of commands in executable files.\nSee bash_scripting for the complete guide with examples.\n\n1.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, you are usually using bash.\n\n2.What is Bash?\n\nBash = Bourne Again SHell\n\nBash is the default command-line shell in most Linux distributions.\n\nWhen you open a terminal, yo",
+      "topic": "networking",
+      "rating": null,
+      "timestamp": "2026-01-24T21:59:10.382406"
+    },
+    {
+      "q": "chmod",
+      "a": "## 🔐 Linux File Permissions\n\n**Definition:** File permissions control who can read, write, or execute files and directories in Linux.\n\n### Permission Basics\n```bash\nls -l file.txt\n-rw-r--r-- 1 owner group 1234 Jan 1 10:00 file.txt\n│├─┤├─┤├─┤\n│ │  │  └── Others permissions\n│ │  └───── Group permissions\n│ └──────── Owner permissions\n└────────── File type\n\nr = Read    (4)  - View contents / List directory\nw = Write   (2)  - Modify / Create files in directory\nx = Execute (1)  - Run / Enter directory",
+      "topic": "linux",
+      "rating": null,
+      "timestamp": "2026-01-24T21:59:23.789760"
     }
   ],
   "learned_facts": [],
   "session_count": 0,
   "topics_asked": {
-    "networking": 5
+    "networking": 6,
+    "linux": 1
   },
   "last_session": null,
   "user_profile": {
@@ -56,7 +71,7 @@
       "networking"
     ],
     "response_preference": "detailed",
-    "questions_count": 3,
+    "questions_count": 4,
     "correct_answers": 0,
     "topics_mastered": []
   }

@@ -2455,7 +2455,7 @@ st.markdown('''
 <div style="text-align:center;padding:24px 0;margin-top:20px">
     <div style="height:1px;background:linear-gradient(90deg,transparent,rgba(0,245,255,0.3),rgba(191,0,255,0.3),transparent);margin-bottom:16px"></div>
     <div style="font-family:'Orbitron',sans-serif;font-size:0.65rem;color:#4a6380;letter-spacing:3px">
-        ENGINEERED WITH <span style="color:#00f5ff;text-shadow:0 0 10px #00f5ff">◆</span> PYCODE AI
+        ENGINEERED WITH <span style="color:#00f5ff;text-shadow:0 0 10px #00f5ff">◆</span> PYCODE AI By Naveen Kumar 
     </div>
 </div>
 ''', unsafe_allow_html=True)
