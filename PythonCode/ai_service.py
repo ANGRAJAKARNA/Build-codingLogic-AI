@@ -47,8 +47,11 @@ def is_ai_available() -> bool:
 
 
 # Model configuration
-DEFAULT_MODEL = "llama-3.1-70b-versatile"
-FAST_MODEL = "llama-3.1-8b-instant"
+# Note: llama-3.1-70b-versatile (retired 2025-01-24) and llama-3.1-8b-instant
+# (retired 2026-08-16) are both past Groq's shutdown dates for these IDs.
+# Using Groq's documented successors instead.
+DEFAULT_MODEL = "openai/gpt-oss-120b"
+FAST_MODEL = "openai/gpt-oss-20b"
 
 
 def _get_cache_key(prompt: str, system_prompt: str, model: str) -> str:
@@ -82,7 +85,7 @@ def get_ai_response(
     Args:
         prompt: User message/prompt
         system_prompt: System instructions for the AI
-        model: Model to use (default: llama-3.1-70b-versatile)
+        model: Model to use (default: openai/gpt-oss-120b)
         temperature: Creativity level (0-1)
         max_tokens: Maximum response length
         conversation_history: Previous messages for context

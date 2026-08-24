@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_saved": "2026-01-24T21:59:29.435576",
+  "last_saved": "2026-08-24T14:20:49.522136",
   "progress": {
     "Basic": {
       "completed": [
@@ -11,7 +11,9 @@
         4,
         5
       ],
-      "skipped": [],
+      "skipped": [
+        6
+      ],
       "times": {
         "0": 39.69,
         "1": 14.39,
@@ -34,7 +36,13 @@
     "streak": {
       "completed": [],
       "skipped": [],
-      "times": {}
+      "times": {},
+      "current": 1,
+      "last_active": "2026-08-24",
+      "max": 1,
+      "history": [
+        "2026-08-24"
+      ]
     }
   }
 }

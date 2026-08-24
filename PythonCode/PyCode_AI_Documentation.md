@@ -30,7 +30,7 @@ January 2026
 PyCode AI is an intelligent, interactive Python learning platform that combines hands-on coding practice with AI-powered assistance. The platform provides a comprehensive learning experience through three core modes: Practice, Interview Preparation, and AI Chat Assistant.
 
 ### 1.2 Key Achievements
-- ✅ **500+ Coding Challenges** across 4 difficulty levels
+- ✅ **188 Coding Challenges** across 4 difficulty levels (150 Python + 38 automation)
 - ✅ **AI Chat Assistant** with 8,000+ lines of educational content
 - ✅ **Mock Interview System** with realistic technical interview simulation
 - ✅ **Secure Code Execution** with sandboxed environment
@@ -158,10 +158,10 @@ Practice Mode provides structured coding challenges across multiple difficulty l
 #### 4.1.2 Difficulty Levels
 | Level | Questions | Avg Time | Topics |
 |-------|-----------|----------|--------|
-| **Basic** | 88 questions | 2-5 min | Lists, loops, strings, basic logic |
-| **Intermediate** | 52 questions | 5-10 min | Dictionaries, algorithms, OOP basics |
-| **Advanced** | 35 questions | 10-20 min | Recursion, dynamic programming, graphs |
-| **Automation** | 45 questions | 5-15 min | Selenium, Robot Framework, pytest |
+| **Basic** | 60 questions | 2-5 min | Lists, loops, strings, basic logic |
+| **Intermediate** | 50 questions | 5-10 min | Dictionaries, algorithms, OOP basics |
+| **Advanced** | 40 questions | 10-20 min | Recursion, dynamic programming, graphs |
+| **Automation** | 38 questions | 5-15 min | Selenium, Robot Framework, pytest |
 
 #### 4.1.3 Features
 ✅ **Real-time Code Execution**

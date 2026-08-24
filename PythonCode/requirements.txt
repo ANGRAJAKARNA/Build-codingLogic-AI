@@ -4,6 +4,12 @@
 # Core framework
 streamlit>=1.28.0
 
+# Per-visitor anonymous identity (browser localStorage) - required for
+# multi-user deployments so visitors don't share one global progress/chat
+# pool. st.context.cookies does not work on Streamlit Community Cloud
+# (its proxy layer filters cookies), so this component is used instead.
+streamlit-local-storage>=0.0.25
+
 # AI Service (Groq) - Optional
 groq>=0.4.0
 

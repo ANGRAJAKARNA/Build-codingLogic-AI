@@ -6,18 +6,36 @@ PyCode - AI-Powered Python Coding Challenge Platform
 
 import streamlit as st
 import time
-import os
 import random
 import html
-from questions import QUESTIONS, ALL_TAGS, count_questions_by_tag
-from evaluator import evaluate_user_code
+from questions import QUESTIONS, ALL_TAGS, count_questions_by_tag, get_all_questions
+
+# Combined Python + automation question bank. QUESTIONS alone only has the
+# 3 core Python difficulty stages (150 problems); ALL_Q also includes the
+# 8 automation categories (Selenium/Robot Framework/pytest, 38 more
+# problems) that were previously loaded but never actually rendered.
+ALL_Q = get_all_questions()
+
+# 20 of the 38 automation problems have no test_cases (Selenium-Advanced,
+# Robot Framework, and pytest entries are class/DSL-based, not
+# input->output checkable) — those stages get a reference-only view
+# instead of a Run/Submit judge.
+AUTOMATION_STAGES = [
+    "Selenium-Basic", "Selenium-Intermediate", "Selenium-Advanced",
+    "RobotFramework-Basic", "RobotFramework-Intermediate", "RobotFramework-Advanced",
+    "pytest-Basic", "pytest-Intermediate",
+]
+from evaluator import evaluate_user_code, run_test_cases, run_snippet
 from persistence import (
     save_progress, load_progress, get_default_progress,
     save_question_time, get_best_time, format_time, get_stats,
     save_interview_history, load_interview_history,
     update_streak, check_achievements, get_new_achievements,
-    get_streak_info, record_solve, export_progress, import_progress
+    get_streak_info, record_solve, export_progress, import_progress,
+    get_visitor_dir, save_achievement_progress, ACHIEVEMENTS,
+    create_backup, list_backups, restore_from_backup, ensure_all_stages
 )
+from visitor_identity import get_visitor_id
 
 # Import Interview Engine
 from interview_engine import (
@@ -45,20 +63,6 @@ try:
     AUDIO_RECORDER_AVAILABLE = True
 except ImportError:
     pass
-
-# AI Services
-GROQ_AVAILABLE = bool(os.environ.get("GROQ_API_KEY"))
-
-if GROQ_AVAILABLE:
-    try:
-        from ai_service import (
-            get_code_review as groq_code_review,
-            get_bug_detection as groq_bug_detection,
-            get_smart_hint as groq_smart_hint,
-            get_tutor_response as groq_tutor_response,
-        )
-    except ImportError:
-        GROQ_AVAILABLE = False
 
 from builtin_assistant import (
     generate_response as builtin_chat,
@@ -671,10 +675,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Visitor identity & per-visitor storage paths — Streamlit Cloud runs one
+# shared process for every visitor, so everything below is scoped to this
+# browser's own anonymous id instead of one global shared file (see
+# visitor_identity.py for why cookies/session_state alone aren't enough).
+visitor_id = get_visitor_id()
+if "visitor_dir" not in st.session_state:
+    st.session_state.visitor_dir = get_visitor_dir(visitor_id)
+visitor_dir = st.session_state.visitor_dir
+progress_path = visitor_dir / "user_progress.json"
+interview_history_path = visitor_dir / "interview_history.json"
+
 # Session State
 if "progress" not in st.session_state:
-    loaded = load_progress()
-    st.session_state.progress = loaded if loaded else get_default_progress()
+    loaded = load_progress(progress_path)
+    st.session_state.progress = ensure_all_stages(loaded) if loaded else get_default_progress()
 
 defaults = {
     "stage": None,
@@ -735,7 +750,7 @@ STAGE_ORDER = [key for key, _, _, _, _ in STAGE_INFO_LIST]
 # Update streak on app load
 if st.session_state.progress:
     st.session_state.progress = update_streak(st.session_state.progress)
-    save_progress(st.session_state.progress)
+    save_progress(st.session_state.progress, progress_path)
 
 DIFFS = ["Basic", "Intermediate", "Advanced"]
 
@@ -749,11 +764,11 @@ def get_status(stage, idx):
 
 
 def get_stats_d(stage):
-    return len(QUESTIONS[stage]), len(st.session_state.progress[stage]["completed"]), len(st.session_state.progress[stage]["skipped"])
+    return len(ALL_Q[stage]), len(st.session_state.progress[stage]["completed"]), len(st.session_state.progress[stage]["skipped"])
 
 
 def next_q(stage):
-    for i in range(len(QUESTIONS[stage])):
+    for i in range(len(ALL_Q[stage])):
         if i not in st.session_state.progress[stage]["completed"] and i not in st.session_state.progress[stage]["skipped"]:
             return i
     return 0
@@ -764,6 +779,7 @@ def go_to(stage, idx):
     st.session_state.q_index = idx
     st.session_state.passed = False
     st.session_state.show_hint = 0
+    st.session_state.used_hint_this_problem = False
     st.session_state.timer_start = time.time()
     st.session_state.ai_feedback = None
     st.session_state.ai_hint = None
@@ -849,43 +865,11 @@ def run_python_code_safe(code: str) -> dict:
     """
     Safely execute Python code and return the result.
     Returns dict with 'output', 'error', and 'success' keys.
+
+    Thin wrapper around evaluator.run_snippet() — the shared sandbox
+    used everywhere in this app, instead of a separate hand-rolled exec().
     """
-    import sys
-    from io import StringIO
-    import traceback
-    
-    # Restricted globals for safety
-    safe_globals = {
-        '__builtins__': {
-            'print': print, 'len': len, 'range': range, 'str': str, 'int': int,
-            'float': float, 'list': list, 'dict': dict, 'set': set, 'tuple': tuple,
-            'bool': bool, 'sum': sum, 'max': max, 'min': min, 'abs': abs,
-            'sorted': sorted, 'reversed': reversed, 'enumerate': enumerate,
-            'zip': zip, 'map': map, 'filter': filter, 'any': any, 'all': all,
-            'isinstance': isinstance, 'type': type, 'round': round, 'pow': pow,
-            'divmod': divmod, 'chr': chr, 'ord': ord, 'hex': hex, 'bin': bin,
-            'True': True, 'False': False, 'None': None,
-        }
-    }
-    
-    # Capture stdout
-    old_stdout = sys.stdout
-    sys.stdout = captured_output = StringIO()
-    
-    result = {'output': '', 'error': '', 'success': False}
-    
-    try:
-        # Execute with timeout protection (basic)
-        exec(code, safe_globals, {})
-        result['output'] = captured_output.getvalue()
-        result['success'] = True
-    except Exception as e:
-        result['error'] = f"{type(e).__name__}: {str(e)}"
-        result['output'] = captured_output.getvalue()
-    finally:
-        sys.stdout = old_stdout
-    
-    return result
+    return run_snippet(code)
 
 def escape_html_content(text: str) -> str:
     """Escape HTML special characters to prevent XSS and display issues."""
@@ -1032,14 +1016,14 @@ def show_chat_modal():
         st.session_state.chat_loading = True
         try:
             if st.session_state.stage:
-                d = QUESTIONS[st.session_state.stage][st.session_state.q_index]
+                d = ALL_Q[st.session_state.stage][st.session_state.q_index]
                 cc = st.session_state.get(f"code_{st.session_state.stage}_{st.session_state.q_index}", "")
-                resp = builtin_chat(msg, d['question'], d['function'], cc, False)
+                resp = builtin_chat(visitor_id, msg, d['question'], d['function'], cc, False)
             else:
-                resp = builtin_chat(msg, "", "", "", False)
+                resp = builtin_chat(visitor_id, msg, "", "", "", False)
             st.session_state.chat_history.append({"role": "assistant", "content": resp})
             try:
-                store_qa_interaction(msg, resp)
+                store_qa_interaction(visitor_id, msg, resp)
             except Exception:
                 pass
         except Exception as e:
@@ -1050,7 +1034,7 @@ def show_chat_modal():
     # ========== HEADER BAR ==========
     # Use cached stats to avoid delay
     if "chat_stats_cache" not in st.session_state:
-        st.session_state.chat_stats_cache = get_learning_stats()
+        st.session_state.chat_stats_cache = get_learning_stats(visitor_id)
     stats = st.session_state.chat_stats_cache
     total_qas = stats.get("total_interactions", 0)
     
@@ -1145,7 +1129,7 @@ def show_chat_modal():
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.button("👍", key="fb_up", help="Good"):
-                        record_feedback(st.session_state.last_user_msg or "", last_ai, True)
+                        record_feedback(visitor_id, st.session_state.last_user_msg or "", last_ai, True)
                         st.toast("Thanks! 🧠")
                 with c2:
                     if st.button("👎", key="fb_down", help="Improve"):
@@ -1184,7 +1168,7 @@ def show_chat_modal():
                     with btn_col1:
                         if st.button("📤 Submit", key="submit_correction", use_container_width=True, type="primary"):
                             ctx = st.session_state.correction_context
-                            record_feedback(ctx["question"], ctx["answer"], False, correction_text if correction_text.strip() else None)
+                            record_feedback(visitor_id, ctx["question"], ctx["answer"], False, correction_text if correction_text.strip() else None)
                             st.session_state.show_correction_input = False
                             st.session_state.correction_context = None
                             if correction_text.strip():
@@ -1195,7 +1179,7 @@ def show_chat_modal():
                     with btn_col2:
                         if st.button("⏭️ Skip", key="skip_correction", use_container_width=True):
                             ctx = st.session_state.correction_context
-                            record_feedback(ctx["question"], ctx["answer"], False)
+                            record_feedback(visitor_id, ctx["question"], ctx["answer"], False)
                             st.session_state.show_correction_input = False
                             st.session_state.correction_context = None
                             st.toast("Noted! 📝")
@@ -1279,20 +1263,6 @@ def show_chat_modal():
                 st.rerun()
 
 
-# ==================== PRE-INITIALIZE LEARNING MODULES ====================
-# This prevents delay when opening AI Chat for the first time
-@st.cache_resource
-def _preload_learning_modules():
-    """Pre-load learning modules at startup to avoid delay when opening chat."""
-    try:
-        # Initialize learning stats (triggers module loading)
-        stats = get_learning_stats()
-        return stats.get("available", False)
-    except Exception:
-        return False
-
-# Trigger pre-loading (happens once at app start)
-_preload_learning_modules()
 
 # ==================== HEADER ====================
 header_cols = st.columns([1, 4, 1])
@@ -1349,6 +1319,63 @@ with mode_cols[1]:
     if mode != st.session_state.app_mode:
         st.session_state.app_mode = mode
         st.rerun()
+
+# ==================== SETTINGS: BACKUP & EXPORT ====================
+with st.expander("⚙️ Settings — Backup & Export"):
+    st.caption("Your progress is tied to this browser. Export a code to keep elsewhere, or create a quick backup.")
+    exp_col, imp_col = st.columns(2)
+
+    with exp_col:
+        st.markdown("**Export Progress**")
+        if st.button("Generate export code", use_container_width=True, key="gen_export"):
+            st.session_state["export_blob"] = export_progress(st.session_state.progress)
+        if st.session_state.get("export_blob"):
+            st.text_area("Copy this code to save your progress", st.session_state["export_blob"], height=100, key="export_blob_display")
+
+    with imp_col:
+        st.markdown("**Import Progress**")
+        import_text = st.text_area("Paste an export code", key="import_blob_input", height=100, label_visibility="visible")
+        merge_import = st.checkbox("Merge with current progress (instead of replacing)", value=True, key="import_merge")
+        if st.button("Import", use_container_width=True, key="do_import"):
+            if import_text.strip():
+                imported = import_progress(import_text.strip(), merge_with_existing=merge_import, existing_progress=st.session_state.progress)
+                if imported:
+                    st.session_state.progress = ensure_all_stages(imported)
+                    save_progress(st.session_state.progress, progress_path)
+                    st.success("Progress imported!")
+                    st.rerun()
+                else:
+                    st.error("Could not import — the code looks invalid or corrupted.")
+            else:
+                st.warning("Paste an export code first.")
+
+    st.divider()
+    st.markdown("**Backups**")
+    backup_dir = visitor_dir / "backups"
+    bcol1, bcol2 = st.columns(2)
+    with bcol1:
+        if st.button("Create backup now", use_container_width=True, key="do_backup"):
+            backup_file = create_backup(st.session_state.progress, backup_dir)
+            if backup_file:
+                st.success(f"Backup created: {backup_file.name}")
+            else:
+                st.error("Backup failed.")
+    with bcol2:
+        backups = list_backups(backup_dir)
+        if backups:
+            choice = st.selectbox("Restore from", options=[b["filename"] for b in backups], key="restore_choice", label_visibility="visible")
+            if st.button("Restore", use_container_width=True, key="do_restore"):
+                chosen = next((b for b in backups if b["filename"] == choice), None)
+                restored = restore_from_backup(chosen["path"]) if chosen else None
+                if restored:
+                    st.session_state.progress = ensure_all_stages(restored)
+                    save_progress(st.session_state.progress, progress_path)
+                    st.success("Progress restored!")
+                    st.rerun()
+                else:
+                    st.error("Could not restore that backup.")
+        else:
+            st.caption("No backups yet.")
 
 # ==================== MAIN LAYOUT - 2 CARDS ====================
 c1, c2 = st.columns([1, 1.3], gap="large")
@@ -1517,7 +1544,7 @@ with c1:
                 st.rerun()
         
             # Interview History
-            history = load_interview_history()
+            history = load_interview_history(interview_history_path)
             if history:
                 st.markdown('<div class="section-title sec-cyan">YOUR HISTORY</div>', unsafe_allow_html=True)
                 for h in history[-3:][::-1]:
@@ -1633,7 +1660,9 @@ with c1:
         st.markdown('<div class="card-header"><span class="card-title">Problems</span></div>', unsafe_allow_html=True)
         
         stats = get_stats(st.session_state.progress)
-        st.markdown(f'<div class="stats-row"><div class="stat-card"><div class="stat-num">{stats["total_completed"]}</div><div class="stat-label">Solved</div></div><div class="stat-card"><div class="stat-num">{stats["completion_rate"]:.0f}%</div><div class="stat-label">Progress</div></div></div>', unsafe_allow_html=True)
+        streak_info = get_streak_info(st.session_state.progress)
+        unlocked_count = len(st.session_state.progress.get("unlocked_achievements", []))
+        st.markdown(f'<div class="stats-row"><div class="stat-card"><div class="stat-num">{stats["total_completed"]}</div><div class="stat-label">Solved</div></div><div class="stat-card"><div class="stat-num">{stats["completion_rate"]:.0f}%</div><div class="stat-label">Progress</div></div><div class="stat-card"><div class="stat-num">🔥{streak_info["current_streak"]}</div><div class="stat-label">Streak</div></div><div class="stat-card"><div class="stat-num">🏆{unlocked_count}</div><div class="stat-label">Achievements</div></div></div>', unsafe_allow_html=True)
         
         st.markdown('<div class="section-title sec-cyan">DIFFICULTY</div>', unsafe_allow_html=True)
         diff_cols = st.columns(3)
@@ -1643,13 +1672,28 @@ with c1:
                 if st.button(d[:3].upper(), key=f"diff_{d}", use_container_width=True, type=btn_type):
                     st.session_state.selected_difficulty = d
                     st.rerun()
-    
+
+        _AUTOMATION_PLACEHOLDER = "— or pick an automation category —"
+        _automation_options = [_AUTOMATION_PLACEHOLDER] + AUTOMATION_STAGES
+        _current_automation_idx = (
+            _automation_options.index(st.session_state.selected_difficulty)
+            if st.session_state.selected_difficulty in AUTOMATION_STAGES else 0
+        )
+        automation_choice = st.selectbox(
+            "Automation category (Selenium / Robot Framework / pytest)",
+            options=_automation_options, index=_current_automation_idx,
+            key="automation_category_picker", label_visibility="collapsed",
+        )
+        if automation_choice != _AUTOMATION_PLACEHOLDER and automation_choice != st.session_state.selected_difficulty:
+            st.session_state.selected_difficulty = automation_choice
+            st.rerun()
+
         selected_d = st.session_state.selected_difficulty
         t, c, s = get_stats_d(selected_d)
         st.markdown(f'<div class="section-title sec-cyan">{selected_d.upper()} ({c}/{t})</div>', unsafe_allow_html=True)
-        
+
         with st.container(height=380):
-            for i, q in enumerate(QUESTIONS[selected_d]):
+            for i, q in enumerate(ALL_Q[selected_d]):
                 status = get_status(selected_d, i)
                 # Replace emoji status icons with text indicators
                 status_text = "✓" if status == "✅" else ("→" if status == "🔄" else str(i+1).zfill(2))
@@ -1742,7 +1786,7 @@ with c2:
                 "interview_type": engine.state.config.interview_type.value,
                 "duration_seconds": engine.state.get_elapsed_time()
             }
-            save_interview_history(result)
+            save_interview_history(result, interview_history_path)
             
             st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
             if st.button("Start New Interview", type="primary", use_container_width=True):
@@ -1846,7 +1890,8 @@ with c2:
                     if VOICE_AVAILABLE:
                         from voice_engine import TextToSpeech
                         tts = TextToSpeech(engine=TTSEngine.AUTO)
-                        intro_text = "Please introduce yourself. You have 10 seconds."
+                        _intro_duration = st.session_state.voice_config.self_intro_duration if st.session_state.voice_config else 30
+                        intro_text = f"Please introduce yourself. You have {_intro_duration} seconds."
                         audio_bytes = tts.synthesize(intro_text)
                         if audio_bytes:
                             st.session_state.current_audio_bytes = audio_bytes
@@ -1859,13 +1904,14 @@ with c2:
             
             # ========== SELF-INTRODUCTION STAGE (Voice Mode Only) ==========
             elif current_stage == "self_intro" and engine.state.voice_enabled:
-                
+                intro_duration = st.session_state.voice_config.self_intro_duration if st.session_state.voice_config else 30
+
                 # Generate and play "introduce yourself" audio if not done
                 if st.session_state.current_audio_bytes is None and not st.session_state.get("intro_audio_played"):
                     if VOICE_AVAILABLE:
                         from voice_engine import TextToSpeech
                         tts = TextToSpeech(engine=TTSEngine.AUTO)
-                        intro_audio = tts.synthesize("Now, please introduce yourself. You have 10 seconds.")
+                        intro_audio = tts.synthesize(f"Now, please introduce yourself. You have {intro_duration} seconds.")
                         if intro_audio:
                             st.session_state.current_audio_bytes = intro_audio
                 
@@ -1877,10 +1923,10 @@ with c2:
                 """, unsafe_allow_html=True)
                 
                 # Show the interviewer's request with audio
-                st.markdown("""
+                st.markdown(f"""
                 <div style="background:rgba(191,0,255,0.15);border:2px solid rgba(191,0,255,0.5);border-radius:16px;padding:16px;margin:10px 0;text-align:center;">
                     <div style="font-size:13px;color:#bf00ff;font-weight:700;margin-bottom:8px">🔊 INTERVIEWER:</div>
-                    <div style="font-size:16px;color:#fff;font-style:italic;">"Now, please introduce yourself. You have 10 seconds."</div>
+                    <div style="font-size:16px;color:#fff;font-style:italic;">"Now, please introduce yourself. You have {intro_duration} seconds."</div>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -1903,10 +1949,13 @@ with c2:
                     st.session_state.intro_audio_played = True
                 
                 # Web Speech API for automatic listening
-                st.markdown("""
+                # (built as a plain string, not an f-string — the JS below has
+                # too many literal { } to safely double-escape; the actual
+                # configured duration is substituted in via .replace() instead)
+                _listen_html = """
                 <div style="text-align:center;margin:20px 0;padding:25px;background:linear-gradient(135deg,rgba(0,255,136,0.15),rgba(0,245,255,0.1));border:2px solid rgba(0,255,136,0.5);border-radius:16px;">
-                    <div style="font-size:14px;color:#00ff88;margin-bottom:8px;font-weight:600;">⏱️ LISTENING... (10 seconds)</div>
-                    <div id="countdown-display" style="font-size:3.5rem;font-weight:900;color:#00ff88;text-shadow:0 0 20px rgba(0,255,136,0.5);">10</div>
+                    <div style="font-size:14px;color:#00ff88;margin-bottom:8px;font-weight:600;">⏱️ LISTENING... (__INTRO_DURATION__ seconds)</div>
+                    <div id="countdown-display" style="font-size:3.5rem;font-weight:900;color:#00ff88;text-shadow:0 0 20px rgba(0,255,136,0.5);">__INTRO_DURATION__</div>
                     <div id="listening-status" style="font-size:14px;color:#fff;margin-top:12px;">🎤 Speak now! Say your introduction...</div>
                     <div id="transcript-display" style="margin-top:16px;padding:12px;background:rgba(0,0,0,0.3);border-radius:8px;min-height:60px;text-align:left;">
                         <span style="color:#8fa3b8;font-style:italic;">Your words will appear here...</span>
@@ -1917,7 +1966,7 @@ with c2:
                 // Web Speech API for automatic speech recognition
                 var finalTranscript = '';
                 var recognition = null;
-                var timeLeft = 10;
+                var timeLeft = __INTRO_DURATION__;
                 
                 // Check if browser supports Web Speech API
                 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -2002,7 +2051,8 @@ with c2:
                 </script>
                 
                 <input type="hidden" id="speech-transcript-input" value="">
-                """, unsafe_allow_html=True)
+                """
+                st.markdown(_listen_html.replace("__INTRO_DURATION__", str(intro_duration)), unsafe_allow_html=True)
                 
                 # Text input for transcript (hidden, populated by JS)
                 transcript_input = st.text_input("Speech transcript:", key="voice_transcript", label_visibility="collapsed")
@@ -2102,7 +2152,7 @@ with c2:
                     st.markdown(f'''
                     <div style="background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.12);border-radius:12px;padding:14px;margin-bottom:12px">
                         <div style="font-size:10px;font-weight:600;color:#f59e0b;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Problem</div>
-                        <div style="font-size:13px;font-weight:500;color:#f5f5f0;line-height:1.5">{problem.get("question", "")}</div>
+                        <div style="font-size:13px;font-weight:500;color:#f5f5f0;line-height:1.5">{escape_html_content(problem.get("question", ""))}</div>
                     </div>
                     ''', unsafe_allow_html=True)
             
@@ -2115,14 +2165,14 @@ with c2:
                             st.markdown(f'''
                             <div style="background:linear-gradient(135deg,#22c55e,#16a34a);color:#0f1a14;padding:10px 14px;border-radius:16px 16px 4px 16px;margin:8px 0 8px 40px;font-size:12px;line-height:1.5">
                                 <div style="font-size:9px;opacity:0.7;margin-bottom:4px">You</div>
-                                {msg["content"]}
+                                {escape_html_content(msg["content"])}
                             </div>
                             ''', unsafe_allow_html=True)
                         else:
                             st.markdown(f'''
                             <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#f5f5f0;padding:10px 14px;border-radius:16px 16px 16px 4px;margin:8px 40px 8px 0;font-size:12px;line-height:1.5">
                                 <div style="font-size:9px;color:#f59e0b;margin-bottom:4px">Interviewer</div>
-                                {msg["content"]}
+                                {escape_html_content(msg["content"])}
                             </div>
                             ''', unsafe_allow_html=True)
                 else:
@@ -2288,9 +2338,9 @@ with c2:
         # Code Editor - when a problem IS selected
         stage = st.session_state.stage
         qi = st.session_state.q_index
-        data = QUESTIONS[stage][qi]
+        data = ALL_Q[stage][qi]
         t, c, s = get_stats_d(stage)
-        
+
         n1, n2, n3 = st.columns([1, 2, 1])
         with n1:
             if st.button("←", key="back"):
@@ -2303,152 +2353,210 @@ with c2:
                 if st.button("→", key="next"):
                     go_to(stage, qi + 1)
                     st.rerun()
-        
+
         st.markdown(f'<div class="problem-box"><div class="problem-title">{data["question"]}</div><div class="badges"><span class="badge {badge_cls(stage)}">{stage}</span>{render_tags(data.get("tags", []))}</div></div>', unsafe_allow_html=True)
-        
         st.progress((c + s) / t if t > 0 else 0)
-        
-        if st.session_state.timer_start is None:
-            st.session_state.timer_start = time.time()
-        if not st.session_state.passed:
-            st.markdown(f'<div class="timer">{format_time(time.time() - st.session_state.timer_start)}</div>', unsafe_allow_html=True)
-        
-        tc = data["test_cases"]
-        if not tc:
-            params = ""
-        elif len(tc[0][0]) == 1:
-            params = "n"
-        elif len(tc[0][0]) == 2:
-            params = "a, b"
+
+        if stage in AUTOMATION_STAGES:
+            # REFERENCE MODE for every automation category, not just the ones
+            # with empty test_cases. Verified empirically: Selenium-Basic and
+            # Selenium-Intermediate DO have non-empty test_cases, but every
+            # single one of their own stored reference solutions fails —
+            # they require `import selenium` (correctly blocked; a sandbox
+            # can't drive a real browser) and most test cases pass a literal
+            # "driver" string standing in for a real WebDriver, which no
+            # amount of correct Selenium code can actually work against.
+            # RobotFramework/pytest/Selenium-Advanced are all class/DSL-based
+            # with genuinely empty test_cases. Net result: none of the 38
+            # automation problems can be meaningfully auto-graded here.
+            # Show it as a read/attempt/
+            # reveal reference instead of a broken or fake Run/Submit judge.
+            st.info("📖 Reference problem — not auto-graded (either no single input→output function to check, or it needs a real browser/tool this sandbox can't provide). Write your own attempt if you like, then reveal the expected approach to compare.")
+
+            st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">Your attempt (not graded)</span></div></div>', unsafe_allow_html=True)
+            st.text_area("", value="", height=150, key=f"code_{stage}_{qi}", label_visibility="collapsed",
+                         placeholder="# Optional — jot down your approach here")
+
+            if data.get("hints"):
+                with st.expander("💡 Hints"):
+                    for h in data["hints"]:
+                        st.markdown(f"- {h}")
+
+            with st.expander("✅ Reveal expected approach"):
+                st.code(data.get("solution", "No reference solution available."), language="python")
+
+            ref_col1, ref_col2 = st.columns(2)
+            with ref_col1:
+                if st.button("Skip", use_container_width=True, key="ref_skip"):
+                    if qi not in st.session_state.progress[stage]["completed"]:
+                        st.session_state.progress[stage]["skipped"].add(qi)
+                        save_progress(st.session_state.progress, progress_path)
+                    go_to(stage, (qi + 1) % t)
+                    st.rerun()
+            with ref_col2:
+                if st.button("Mark as reviewed", use_container_width=True, type="primary", key="ref_done"):
+                    # Counts toward completion/progress like a normal solve,
+                    # but deliberately does NOT go through record_solve() /
+                    # achievement-checking — there's no real verification
+                    # here, so it shouldn't be able to farm hint-free-solve
+                    # or speed achievements.
+                    st.session_state.progress[stage]["completed"].add(qi)
+                    st.session_state.progress[stage]["skipped"].discard(qi)
+                    save_progress(st.session_state.progress, progress_path)
+                    st.success("Marked as reviewed!")
+                    st.rerun()
+            return_early = True
         else:
-            params = ", ".join([f"arg{j+1}" for j in range(len(tc[0][0]))])
-        template = f"def {data['function']}({params}):\n    # Your code here\n    pass"
-        
-        st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">Write your code below</span></div></div>', unsafe_allow_html=True)
-        
-        code = st.text_area("", value=template, height=120, key=f"code_{stage}_{qi}", label_visibility="collapsed")
-        
-        btn1, btn2, btn3 = st.columns(3)
-        with btn1:
-            run_btn = st.button("Run", type="primary", use_container_width=True)
-        with btn2:
-            hint_btn = st.button("Hint", use_container_width=True)
-        with btn3:
-            skip_btn = st.button("Skip", use_container_width=True)
-        
-        if hint_btn:
-            with st.spinner("Thinking..."):
-                try:
-                    st.session_state.ai_hint = builtin_smart_hint(code, data['question'], data['function'], data.get('hints', []), st.session_state.show_hint + 1)
-                    st.session_state.show_hint += 1
-                except Exception as e:
-                    st.session_state.ai_hint = str(e)
-        
-        if st.session_state.ai_hint:
-            st.markdown(f'<div class="msg-hint">{st.session_state.ai_hint}</div>', unsafe_allow_html=True)
-        
-        if run_btn:
-            ok, msg = evaluate_user_code(code, data["function"], data["test_cases"])
-            if ok:
-                # SUCCESS: All tests passed
-                el = time.time() - st.session_state.timer_start
-                st.markdown(f'<div class="msg-ok">✅ All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
-                st.session_state.passed = True
-                st.session_state.progress[stage]["completed"].add(qi)
-                st.session_state.progress[stage]["skipped"].discard(qi)
-                st.session_state.progress = save_question_time(st.session_state.progress, stage, qi, el)
-                save_progress(st.session_state.progress)
-                # Generate code review only on success
-                with st.spinner("Analyzing your solution..."):
-                    try:
-                        st.session_state.ai_feedback = builtin_code_review(code, data['question'], data['function'], el)
-                    except Exception:
-                        pass
+            return_early = False
+
+        if not return_early:
+            if st.session_state.timer_start is None:
+                st.session_state.timer_start = time.time()
+            if not st.session_state.passed:
+                st.markdown(f'<div class="timer">{format_time(time.time() - st.session_state.timer_start)}</div>', unsafe_allow_html=True)
+
+            tc = data["test_cases"]
+            if not tc:
+                params = ""
+            elif len(tc[0][0]) == 1:
+                params = "n"
+            elif len(tc[0][0]) == 2:
+                params = "a, b"
             else:
-                # FAILURE: Tests failed - show error and bug hint
-                st.markdown(f'<div class="msg-err">{msg}</div>', unsafe_allow_html=True)
-                with st.spinner("Analyzing error..."):
+                params = ", ".join([f"arg{j+1}" for j in range(len(tc[0][0]))])
+            template = f"def {data['function']}({params}):\n    # Your code here\n    pass"
+
+            st.markdown('<div class="editor-box"><div class="editor-header"><span class="dot d-r"></span><span class="dot d-y"></span><span class="dot d-g"></span><span class="editor-file">Write your code below</span></div></div>', unsafe_allow_html=True)
+
+            code = st.text_area("", value=template, height=120, key=f"code_{stage}_{qi}", label_visibility="collapsed")
+
+            btn1, btn2, btn3 = st.columns(3)
+            with btn1:
+                run_btn = st.button("Run", type="primary", use_container_width=True)
+            with btn2:
+                hint_btn = st.button("Hint", use_container_width=True)
+            with btn3:
+                skip_btn = st.button("Skip", use_container_width=True)
+
+            if hint_btn:
+                with st.spinner("Thinking..."):
                     try:
-                        bug = builtin_bug_hint(code, msg, data['question'], data['function'])
-                        st.markdown(f'<div class="msg-hint">{bug}</div>', unsafe_allow_html=True)
-                    except Exception:
-                        pass
-        
-        if st.session_state.ai_feedback:
-            st.markdown(f'<div class="msg-hint">{st.session_state.ai_feedback}</div>', unsafe_allow_html=True)
-        
-        if skip_btn:
-            if qi not in st.session_state.progress[stage]["completed"]:
-                st.session_state.progress[stage]["skipped"].add(qi)
-                save_progress(st.session_state.progress)
-            go_to(stage, (qi + 1) % t)
-            st.rerun()
-        
-        # Display TEST CASES with actual results if code was run
-        st.markdown('<div class="section-title sec-purple">TEST CASES</div>', unsafe_allow_html=True)
-        
-        # Check if we have test results to show (after running code)
-        test_results_key = f"test_results_{stage}_{qi}"
-        if run_btn:
-            # Run each test case and store results
-            test_results = []
-            try:
-                # Compile and execute user code to get the function
-                safe_env = {'__builtins__': {
-                    'range': range, 'len': len, 'int': int, 'str': str, 'list': list, 
-                    'dict': dict, 'set': set, 'tuple': tuple, 'bool': bool, 'float': float,
-                    'sum': sum, 'min': min, 'max': max, 'abs': abs, 'sorted': sorted,
-                    'enumerate': enumerate, 'zip': zip, 'map': map, 'filter': filter,
-                    'True': True, 'False': False, 'None': None, 'print': lambda *args: None,
-                    'reversed': reversed, 'any': any, 'all': all, 'pow': pow, 'round': round,
-                    'divmod': divmod, 'isinstance': isinstance, 'type': type,
-                }}
-                exec(compile(code, '<user_code>', 'exec'), safe_env)
-                func = safe_env.get(data["function"])
-                
-                if func:
-                    for inp, exp in data["test_cases"][:3]:
+                        st.session_state.ai_hint = builtin_smart_hint(code, data['question'], data['function'], data.get('hints', []), st.session_state.show_hint + 1)
+                        st.session_state.show_hint += 1
+                        st.session_state.used_hint_this_problem = True
+                    except Exception as e:
+                        st.session_state.ai_hint = str(e)
+
+            if st.session_state.ai_hint:
+                st.markdown(f'<div class="msg-hint">{st.session_state.ai_hint}</div>', unsafe_allow_html=True)
+
+            if run_btn:
+                ok, msg = evaluate_user_code(code, data["function"], data["test_cases"])
+                if ok:
+                    # SUCCESS: All tests passed
+                    el = time.time() - st.session_state.timer_start
+                    st.markdown(f'<div class="msg-ok">✅ All tests passed! Time: {format_time(el)}</div>', unsafe_allow_html=True)
+                    st.session_state.passed = True
+                    already_completed = qi in st.session_state.progress[stage]["completed"]
+                    st.session_state.progress[stage]["completed"].add(qi)
+                    st.session_state.progress[stage]["skipped"].discard(qi)
+                    st.session_state.progress = save_question_time(st.session_state.progress, stage, qi, el)
+                    if not already_completed:
+                        # Only record streak/hint-free-solve stats and check for
+                        # newly-unlocked achievements on the FIRST time this
+                        # question is solved — record_solve() isn't idempotent
+                        # (it increments solved_without_hints), so re-running this
+                        # on a redundant Run click after already passing would
+                        # silently over-count it.
+                        st.session_state.progress = record_solve(st.session_state.progress, st.session_state.used_hint_this_problem)
+                        old_achievement_ids = st.session_state.progress.get("unlocked_achievements", [])
+                        new_achievements = get_new_achievements(st.session_state.progress, old_achievement_ids)
+                        if new_achievements:
+                            st.session_state.new_achievement = new_achievements
+                            st.session_state.last_achievements = new_achievements
+                            for ach in new_achievements:
+                                st.toast(f"Achievement unlocked: {ach['name']}", icon=ach.get("icon", "🏆"))
+                    save_achievement_progress(st.session_state.progress, progress_path)
+                    # Generate code review only on success
+                    with st.spinner("Analyzing your solution..."):
                         try:
-                            actual = func(*inp)
-                            passed = actual == exp
-                            test_results.append((inp, exp, actual, passed, None))
-                        except Exception as e:
-                            test_results.append((inp, exp, None, False, str(e)))
+                            st.session_state.ai_feedback = builtin_code_review(code, data['question'], data['function'], el)
+                        except Exception:
+                            pass
                 else:
-                    test_results = [(inp, exp, None, False, "Function not found") for inp, exp in data["test_cases"][:3]]
-            except Exception as e:
-                test_results = [(inp, exp, None, False, f"Code error: {str(e)[:50]}") for inp, exp in data["test_cases"][:3]]
-            
-            st.session_state[test_results_key] = test_results
-        
-        # Display test cases with results if available
-        if test_results_key in st.session_state and st.session_state[test_results_key]:
-            for inp, exp, actual, passed, error in st.session_state[test_results_key]:
-                if error:
-                    st.markdown(f'''
-                    <div class="test-case" style="border-left:3px solid #ff6b6b">
-                        <span class="test-lbl">❌ Input:</span> {inp} → 
-                        <span class="test-lbl">Expected:</span> {exp} | 
-                        <span style="color:#ff6b6b">Error: {error}</span>
-                    </div>''', unsafe_allow_html=True)
-                elif passed:
-                    st.markdown(f'''
-                    <div class="test-case" style="border-left:3px solid #00ff88">
-                        <span class="test-lbl">✅ Input:</span> {inp} → 
-                        <span class="test-lbl">Expected:</span> {exp} | 
-                        <span style="color:#00ff88">Got: {actual}</span>
-                    </div>''', unsafe_allow_html=True)
+                    # FAILURE: Tests failed - show error and bug hint
+                    st.markdown(f'<div class="msg-err">{msg}</div>', unsafe_allow_html=True)
+                    with st.spinner("Analyzing error..."):
+                        try:
+                            bug = builtin_bug_hint(code, msg, data['question'], data['function'])
+                            st.markdown(f'<div class="msg-hint">{bug}</div>', unsafe_allow_html=True)
+                        except Exception:
+                            pass
+
+            if st.session_state.ai_feedback:
+                st.markdown(f'<div class="msg-hint">{st.session_state.ai_feedback}</div>', unsafe_allow_html=True)
+
+            if skip_btn:
+                if qi not in st.session_state.progress[stage]["completed"]:
+                    st.session_state.progress[stage]["skipped"].add(qi)
+                    save_progress(st.session_state.progress, progress_path)
+                go_to(stage, (qi + 1) % t)
+                st.rerun()
+
+            # Display TEST CASES with actual results if code was run
+            st.markdown('<div class="section-title sec-purple">TEST CASES</div>', unsafe_allow_html=True)
+
+            # Check if we have test results to show (after running code)
+            test_results_key = f"test_results_{stage}_{qi}"
+            if run_btn:
+                # Run each sample test case and store results — goes through the
+                # same shared, security-checked sandbox as evaluate_user_code()
+                # instead of a separately hand-rolled exec() with its own whitelist.
+                sample_cases = data["test_cases"][:3]
+                status, payload = run_test_cases(code, data["function"], sample_cases, stop_on_first_failure=False)
+
+                if status == 'function_not_found':
+                    test_results = [(inp, exp, None, False, "Function not found") for inp, exp in sample_cases]
+                elif status != 'ok':
+                    short_msg = str(payload).replace('\n', ' ')[:50]
+                    test_results = [(inp, exp, None, False, f"Code error: {short_msg}") for inp, exp in sample_cases]
                 else:
-                    st.markdown(f'''
-                    <div class="test-case" style="border-left:3px solid #ff6b6b">
-                        <span class="test-lbl">❌ Input:</span> {inp} → 
-                        <span class="test-lbl">Expected:</span> {exp} | 
-                        <span style="color:#ff6b6b">Got: {actual}</span>
-                    </div>''', unsafe_allow_html=True)
-        else:
-            # Show expected outputs only (before running)
-            for inp, exp in data["test_cases"][:3]:
-                st.markdown(f'<div class="test-case"><span class="test-lbl">Input:</span> {inp} → <span class="test-lbl">Expected:</span> {exp}</div>', unsafe_allow_html=True)
+                    test_results = [
+                        (r["inputs"], r["expected"], r["actual"], r["passed"],
+                         r["error_str"] if r["case_status"] == "error" else None)
+                        for r in payload
+                    ]
+
+                st.session_state[test_results_key] = test_results
+
+            # Display test cases with results if available
+            if test_results_key in st.session_state and st.session_state[test_results_key]:
+                for inp, exp, actual, passed, error in st.session_state[test_results_key]:
+                    if error:
+                        st.markdown(f'''
+                        <div class="test-case" style="border-left:3px solid #ff6b6b">
+                            <span class="test-lbl">❌ Input:</span> {inp} →
+                            <span class="test-lbl">Expected:</span> {exp} |
+                            <span style="color:#ff6b6b">Error: {error}</span>
+                        </div>''', unsafe_allow_html=True)
+                    elif passed:
+                        st.markdown(f'''
+                        <div class="test-case" style="border-left:3px solid #00ff88">
+                            <span class="test-lbl">✅ Input:</span> {inp} →
+                            <span class="test-lbl">Expected:</span> {exp} |
+                            <span style="color:#00ff88">Got: {actual}</span>
+                        </div>''', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'''
+                        <div class="test-case" style="border-left:3px solid #ff6b6b">
+                            <span class="test-lbl">❌ Input:</span> {inp} →
+                            <span class="test-lbl">Expected:</span> {exp} |
+                            <span style="color:#ff6b6b">Got: {actual}</span>
+                        </div>''', unsafe_allow_html=True)
+            else:
+                # Show expected outputs only (before running)
+                for inp, exp in data["test_cases"][:3]:
+                    st.markdown(f'<div class="test-case"><span class="test-lbl">Input:</span> {inp} → <span class="test-lbl">Expected:</span> {exp}</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown('''

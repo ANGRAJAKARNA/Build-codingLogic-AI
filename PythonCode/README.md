@@ -12,7 +12,7 @@ An AI-powered interactive platform for learning Python programming, test automat
 ## ✨ Features
 
 ### 🎯 Practice Mode
-- **50+ Coding Challenges** across multiple difficulty levels (Easy, Medium, Hard)
+- **188 Coding Challenges** across multiple difficulty levels (150 Python: Basic/Intermediate/Advanced, plus 38 automation problems)
 - **Real-time Code Execution** with secure sandbox environment
 - **Instant Feedback** with test case validation
 - **Smart Hints** and solution explanations

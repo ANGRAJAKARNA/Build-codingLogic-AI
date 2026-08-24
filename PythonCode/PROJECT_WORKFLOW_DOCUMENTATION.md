@@ -51,7 +51,7 @@ PyCode AI is an **AI-powered interactive learning platform** for Python programm
 ├── Total Lines of Code: 25,000+
 ├── Python Modules: 15+
 ├── Concepts Covered: 175+
-├── Practice Problems: 150+
+├── Practice Problems: 188 (150 Python + 38 automation)
 ├── Test Coverage: ~90%
 └── Knowledge Domains: 5
     ├── Python Core (47 concepts)

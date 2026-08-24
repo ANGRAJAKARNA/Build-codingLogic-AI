@@ -360,30 +360,10 @@ Interview style for SENIOR candidates:
 # =============================================================================
 # BEHAVIORAL QUESTION BANKS
 # =============================================================================
-
-BEHAVIORAL_QUESTIONS_JUNIOR = [
-    "Tell me about a project you worked on that you're proud of.",
-    "How do you approach learning something new in programming?",
-    "Describe a time when you had to debug a tricky issue.",
-    "How do you handle feedback on your code?",
-    "Tell me about a time you collaborated with others on code.",
-]
-
-BEHAVIORAL_QUESTIONS_MID = [
-    "Tell me about a challenging technical problem you solved.",
-    "Describe a time you had to work with unclear requirements.",
-    "How do you approach code reviews?",
-    "Tell me about a time you had to meet a tight deadline.",
-    "Describe a situation where you disagreed with a technical decision.",
-]
-
-BEHAVIORAL_QUESTIONS_SENIOR = [
-    "Tell me about a system you designed from scratch.",
-    "Describe a time you had to mentor a struggling team member.",
-    "How do you balance technical debt against new features?",
-    "Tell me about a time you had to make a difficult architectural decision.",
-    "Describe how you've influenced engineering culture at a previous company.",
-]
+# Difficulty-tiered behavioral questions now live in interview_engine.py's
+# own BEHAVIORAL_QUESTIONS dict (keyed by InterviewDifficulty), which
+# _handle_behavioral_stage() actually uses — this used to be a second,
+# never-imported copy of the same idea with slightly different wording.
 
 
 # =============================================================================

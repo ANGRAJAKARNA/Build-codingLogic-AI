@@ -11,28 +11,34 @@ When no API key, uses local pattern matching and PDF knowledge base.
 import os
 import re
 import random
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from typing import Dict, List, Optional, Tuple, Any
 
 # =============================================================================
 # SELF-LEARNING MODULE INTEGRATION
 # =============================================================================
 
 LEARNING_AVAILABLE = False
-_learning_memory = None
-_feedback_learner = None
-
 _smart_matcher = None
 
-def _init_learning_modules():
-    """Initialize learning modules if available."""
-    global LEARNING_AVAILABLE, _learning_memory, _feedback_learner, _smart_matcher
-    if _learning_memory is not None:
+# Per-visitor learning-module caches. Streamlit Cloud runs one shared
+# process for every visitor, so — like learning_memory.py's own instance
+# cache — these are keyed by visitor_id instead of being single globals,
+# otherwise every visitor's chat memory and feedback would bleed into
+# everyone else's. _smart_matcher/LEARNING_AVAILABLE stay plain globals:
+# they're just a class reference and an availability flag, not per-visitor
+# state, so they're safe to share.
+_learning_memory_by_visitor: Dict[str, Any] = {}
+_feedback_learner_by_visitor: Dict[str, Any] = {}
+
+def _init_learning_modules(visitor_id: str):
+    """Initialize (or fetch the already-cached) learning modules for this visitor."""
+    global LEARNING_AVAILABLE, _smart_matcher
+    if visitor_id in _learning_memory_by_visitor:
         return True
     try:
         from learning_memory import get_memory, get_feedback_learner, detect_topic, SmartMatcher
-        _learning_memory = get_memory()
-        _feedback_learner = get_feedback_learner()
+        _learning_memory_by_visitor[visitor_id] = get_memory(visitor_id)
+        _feedback_learner_by_visitor[visitor_id] = get_feedback_learner(visitor_id)
         _smart_matcher = SmartMatcher
         LEARNING_AVAILABLE = True
         return True
@@ -40,85 +46,86 @@ def _init_learning_modules():
         LEARNING_AVAILABLE = False
         return False
 
-def get_smart_matcher():
+def get_smart_matcher(visitor_id: str):
     """Get the SmartMatcher class for spell correction."""
-    _init_learning_modules()
+    _init_learning_modules(visitor_id)
     return _smart_matcher
 
-def get_learning_memory():
-    """Get the conversation memory instance."""
-    _init_learning_modules()
-    return _learning_memory
+def get_learning_memory(visitor_id: str):
+    """Get this visitor's conversation memory instance."""
+    _init_learning_modules(visitor_id)
+    return _learning_memory_by_visitor.get(visitor_id)
 
-def get_feedback_learner_instance():
-    """Get the feedback learner instance."""
-    _init_learning_modules()
-    return _feedback_learner
+def get_feedback_learner_instance(visitor_id: str):
+    """Get this visitor's feedback learner instance."""
+    _init_learning_modules(visitor_id)
+    return _feedback_learner_by_visitor.get(visitor_id)
 
-def store_qa_interaction(question: str, answer: str, topic: str = None):
-    """Store a Q&A interaction for learning."""
-    if not _init_learning_modules():
+def store_qa_interaction(visitor_id: str, question: str, answer: str, topic: str = None):
+    """Store a Q&A interaction for learning, scoped to this visitor."""
+    if not _init_learning_modules(visitor_id):
         return
     try:
         from learning_memory import detect_topic
         topic = topic or detect_topic(question)
-        _learning_memory.store_qa(question, answer, topic)
+        _learning_memory_by_visitor[visitor_id].store_qa(question, answer, topic)
     except Exception:
         pass
 
-def record_feedback(question: str, answer: str, is_positive: bool, correction: str = None):
-    """Record user feedback on a response with advanced learning."""
-    if not _init_learning_modules():
+def record_feedback(visitor_id: str, question: str, answer: str, is_positive: bool, correction: str = None):
+    """Record user feedback on a response with advanced learning, scoped to this visitor."""
+    if not _init_learning_modules(visitor_id):
         return
     try:
         from learning_memory import update_learning_from_feedback
         # Use the advanced feedback function that also updates user profile
-        update_learning_from_feedback(question, answer, is_positive, correction)
+        update_learning_from_feedback(visitor_id, question, answer, is_positive, correction)
     except ImportError:
         # Fallback to basic feedback recording
         try:
             from learning_memory import detect_topic
             topic = detect_topic(question)
-            _feedback_learner.record_feedback(topic, question, answer, is_positive, correction)
+            _feedback_learner_by_visitor[visitor_id].record_feedback(topic, question, answer, is_positive, correction)
         except Exception:
             pass
     except Exception:
         pass
 
-def _check_learned_response(user_message: str) -> Optional[Dict]:
+def _check_learned_response(visitor_id: str, user_message: str) -> Optional[Dict]:
     """
-    Check if we have a learned response for this question.
-    Uses advanced matching including corrections.
-    
+    Check if we have a learned response for this question, from this
+    visitor's own learned corrections/ratings. Uses advanced matching
+    including corrections.
+
     Returns:
         Dict with 'answer', 'confidence', 'source' or None
     """
-    if not _init_learning_modules():
+    if not _init_learning_modules(visitor_id):
         return None
-    
+
     try:
         from learning_memory import get_smart_response, detect_topic
-        
+
         # Use the new smart response system
-        learned = get_smart_response(user_message)
-        
+        learned = get_smart_response(visitor_id, user_message)
+
         if learned:
             return learned
-        
+
         # Fallback to simple check for older data format
         topic = detect_topic(user_message)
         if topic:
-            similar = _feedback_learner.find_similar_question(user_message, topic)
+            similar = _feedback_learner_by_visitor[visitor_id].find_similar_question(user_message, topic)
             if similar and similar.get("score", 0) >= 3:
                 return {
                     "answer": similar.get("a"),
                     "confidence": similar.get("_confidence", {"score": 0.7, "icon": "🟢", "level": "high"}),
                     "source": "learned"
                 }
-        
+
     except Exception:
         pass
-    
+
     return None
 
 
@@ -144,33 +151,33 @@ def _format_learned_response(learned: Dict) -> str:
     return header + answer
 
 
-def get_response_with_learning(user_message: str, *args, **kwargs) -> Tuple[str, Optional[Dict]]:
+def get_response_with_learning(visitor_id: str, user_message: str, *args, **kwargs) -> Tuple[str, Optional[Dict]]:
     """
     Get a response, checking learned responses first.
-    
+
     Returns:
         Tuple of (response_text, learning_info)
         learning_info is None if response was generated, or Dict with confidence if learned
     """
     # Check for learned response first
-    learned = _check_learned_response(user_message)
-    
+    learned = _check_learned_response(visitor_id, user_message)
+
     if learned and learned.get("answer"):
         formatted = _format_learned_response(learned)
         return (formatted, learned)
-    
+
     # No learned response, generate normally
     # (The generate_response function will be called separately)
     return (None, None)
 
-def get_learning_stats() -> Dict:
-    """Get combined learning statistics."""
-    if not _init_learning_modules():
+def get_learning_stats(visitor_id: str) -> Dict:
+    """Get combined learning statistics for this visitor."""
+    if not _init_learning_modules(visitor_id):
         return {"available": False}
-    
+
     try:
-        mem_stats = _learning_memory.get_stats()
-        fb_stats = _feedback_learner.get_stats()
+        mem_stats = _learning_memory_by_visitor[visitor_id].get_stats()
+        fb_stats = _feedback_learner_by_visitor[visitor_id].get_stats()
         user_profile = mem_stats.get("user_profile", {})
         
         # Check if semantic search is available
@@ -245,7 +252,7 @@ def _query_groq(prompt: str, system_prompt: str = None, max_tokens: int = 512) -
         messages.append({"role": "user", "content": prompt})
         
         response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Fast model for quick responses
+            model="openai/gpt-oss-20b",  # Fast model for quick responses (llama-3.1-8b-instant was retired 2026-08-16)
             messages=messages,
             temperature=0.7,
             max_tokens=max_tokens
@@ -616,169 +623,6 @@ def get_enhanced_concept_response(topic: str) -> Optional[str]:
 
 CONCEPTS = {
     # Data Structures
-    "list": """## 📚 Lists in Python
-
-**Definition:** Ordered, mutable collection of items.
-
-### Creating Lists
-```python
-empty = []
-numbers = [1, 2, 3, 4, 5]
-mixed = [1, "hello", 3.14, True]
-nested = [[1, 2], [3, 4]]
-from_range = list(range(10))
-```
-
-### Common Operations
-| Operation | Example | Result |
-|-----------|---------|--------|
-| Access | `nums[0]` | First element |
-| Slice | `nums[1:3]` | Elements 1-2 |
-| Append | `nums.append(6)` | Add to end |
-| Insert | `nums.insert(0, 0)` | Add at index |
-| Remove | `nums.remove(3)` | Remove first 3 |
-| Pop | `nums.pop()` | Remove & return last |
-| Length | `len(nums)` | Count elements |
-| Sort | `nums.sort()` | Sort in-place |
-| Reverse | `nums.reverse()` | Reverse in-place |
-
-### List Comprehension
-```python
-# Basic
-squares = [x**2 for x in range(10)]
-
-# With condition
-evens = [x for x in range(20) if x % 2 == 0]
-
-# Nested
-matrix = [[i*j for j in range(3)] for i in range(3)]
-```
-
-### Time Complexity
-- Access by index: O(1)
-- Append: O(1) amortized
-- Insert/Delete at index: O(n)
-- Search: O(n)
-- Sort: O(n log n)""",
-
-    "dictionary": """## 📖 Dictionaries in Python
-
-**Definition:** Key-value pairs with O(1) average lookup.
-
-### Creating Dictionaries
-```python
-empty = {}
-person = {"name": "Alice", "age": 30}
-from_pairs = dict([("a", 1), ("b", 2)])
-comprehension = {x: x**2 for x in range(5)}
-```
-
-### Common Operations
-```python
-# Access
-person["name"]           # KeyError if missing
-person.get("name")       # Returns None if missing
-person.get("city", "N/A") # Default value
-
-# Modify
-person["age"] = 31       # Update
-person["city"] = "NYC"   # Add new
-
-# Remove
-del person["age"]        # Delete key
-person.pop("name")       # Remove & return
-
-# Check
-"name" in person         # True/False
-
-# Iterate
-for key in person:
-for key, value in person.items():
-for value in person.values():
-```
-
-### Advanced Patterns
-```python
-# Counting
-from collections import Counter
-counts = Counter("mississippi")
-
-# Default values
-from collections import defaultdict
-graph = defaultdict(list)
-graph["a"].append("b")
-
-# Ordered (Python 3.7+)
-# Dicts maintain insertion order
-```
-
-### Time Complexity
-- Get/Set/Delete: O(1) average
-- Iteration: O(n)
-- Space: O(n)""",
-
-    "string": """## 🔤 Strings in Python
-
-**Definition:** Immutable sequence of characters.
-
-### Creating Strings
-```python
-single = 'hello'
-double = "world"
-multiline = '''Line 1
-Line 2'''
-raw = r"C:\\path\\file"  # No escaping
-f_string = f"Value: {42}"
-```
-
-### Common Methods
-```python
-s = "  Hello World  "
-
-# Case
-s.upper()         # "  HELLO WORLD  "
-s.lower()         # "  hello world  "
-s.title()         # "  Hello World  "
-s.capitalize()    # "  hello world  "
-
-# Whitespace
-s.strip()         # "Hello World"
-s.lstrip()        # "Hello World  "
-s.rstrip()        # "  Hello World"
-
-# Search
-s.find("World")   # 8 (index or -1)
-s.index("World")  # 8 (raises if not found)
-s.count("l")      # 3
-
-# Check
-s.startswith("  H")  # True
-s.endswith("  ")     # True
-s.isdigit()          # False
-s.isalpha()          # False
-
-# Transform
-s.replace("World", "Python")
-s.split()         # ["Hello", "World"]
-"-".join(["a", "b", "c"])  # "a-b-c"
-```
-
-### String Slicing
-```python
-s = "Python"
-s[0]      # 'P'
-s[-1]     # 'n'
-s[1:4]    # 'yth'
-s[::2]    # 'Pto'
-s[::-1]   # 'nohtyP' (reverse)
-```
-
-### Time Complexity
-- Access: O(1)
-- Slice: O(k) where k is slice size
-- Concatenation: O(n+m)
-- Search: O(n)""",
-
     "set": """## 🎯 Sets in Python
 
 **Definition:** Unordered collection of unique elements.
@@ -869,69 +713,6 @@ print(p.x, p.y)  # 3 4
 ```""",
 
     # Algorithms & Patterns
-    "loop": """## 🔄 Loops in Python
-
-### For Loops
-```python
-# Basic iteration
-for item in [1, 2, 3]:
-    print(item)
-
-# With range
-for i in range(5):        # 0, 1, 2, 3, 4
-for i in range(2, 5):     # 2, 3, 4
-for i in range(0, 10, 2): # 0, 2, 4, 6, 8
-
-# With enumerate (index + value)
-for i, val in enumerate(['a', 'b', 'c']):
-    print(f"{i}: {val}")
-
-# With zip (parallel iteration)
-for a, b in zip([1, 2], ['x', 'y']):
-    print(a, b)
-```
-
-### While Loops
-```python
-count = 0
-while count < 5:
-    print(count)
-    count += 1
-
-# With break/continue
-while True:
-    if condition:
-        break     # Exit loop
-    if skip:
-        continue  # Skip to next iteration
-```
-
-### Loop Patterns
-```python
-# Find element
-for item in items:
-    if condition(item):
-        return item
-
-# Accumulate
-total = 0
-for num in numbers:
-    total += num
-
-# Transform
-result = []
-for item in items:
-    result.append(transform(item))
-# Better: result = [transform(item) for item in items]
-
-# Filter
-result = []
-for item in items:
-    if condition(item):
-        result.append(item)
-# Better: result = [item for item in items if condition(item)]
-```""",
-
     "recursion": """## 🔁 Recursion in Python
 
 **Definition:** A function that calls itself to solve smaller subproblems.
@@ -4635,7 +4416,13 @@ text[-1]     # 'n' (last character)
 text[0:3]    # 'Pyt' (slice)
 text[::2]    # 'Pto' (every 2nd char)
 text[::-1]   # 'nohtyP' (reverse)
-```""",
+```
+
+### Time Complexity
+- Access: O(1)
+- Slice: O(k) where k is slice size
+- Concatenation: O(n+m)
+- Search: O(n)""",
 
     # =========================================================================
     # LIST METHODS
@@ -4761,7 +4548,14 @@ min(nums)    # 1 (minimum)
 max(nums)    # 5 (maximum)
 any(nums)    # True (any truthy)
 all(nums)    # True (all truthy)
-```""",
+```
+
+### Time Complexity
+- Access by index: O(1)
+- Append: O(1) amortized
+- Insert/Delete at index: O(n)
+- Search: O(n)
+- Sort: O(n log n)""",
 
     # =========================================================================
     # DICTIONARY METHODS
@@ -4907,7 +4701,12 @@ students = {
 
 # Access nested values
 alice_math = students["alice"]["grades"]["math"]  # 90
-```""",
+```
+
+### Time Complexity
+- Get/Set/Delete: O(1) average
+- Iteration: O(n)
+- Space: O(n)""",
 
     # =========================================================================
     # COMPREHENSIONS
@@ -6631,21 +6430,27 @@ def _detect_code_explanation_request(message: str) -> Optional[str]:
 
 
 def generate_response(
+    visitor_id: str,
     user_message: str,
     question: str = "",
     function_name: str = "",
     user_code: str = "",
     interview_mode: bool = False
 ) -> str:
-    """Generate a comprehensive, helpful response based on user input."""
-    
+    """Generate a comprehensive, helpful response based on user input.
+
+    visitor_id scopes the self-learning lookups (learned responses,
+    corrections) to this visitor's own history instead of a shared global
+    one — see visitor_identity.py for how it's obtained.
+    """
+
     msg_lower = user_message.lower().strip()
     spelling_notice = ""  # Will hold any spelling correction notice
-    
+
     # ==========================================================================
     # SPELLING CORRECTION: Check and fix typos in the query
     # ==========================================================================
-    SmartMatcher = get_smart_matcher()
+    SmartMatcher = get_smart_matcher(visitor_id)
     if SmartMatcher:
         corrections = SmartMatcher.get_spelling_corrections(user_message)
         if corrections:
@@ -6673,7 +6478,7 @@ def generate_response(
     # ==========================================================================
     # SELF-LEARNING: Check for learned responses (corrections + rated)
     # ==========================================================================
-    learned_response = _check_learned_response(user_message)
+    learned_response = _check_learned_response(visitor_id, user_message)
     if learned_response and learned_response.get("answer"):
         # We have a learned response - format it with confidence indicator
         return spelling_notice + _format_learned_response(learned_response)

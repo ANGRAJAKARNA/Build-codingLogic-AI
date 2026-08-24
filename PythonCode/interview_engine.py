@@ -759,9 +759,11 @@ class InterviewEngine:
         
         # Check code progress
         if code and len(code.strip()) > 100:
-            # They have substantial code
+            # They have substantial code. Note: code_quality itself is
+            # already scored once per submission by _evaluate_code_quality()
+            # (called from _analyze_response(), which always runs before this
+            # method) — don't add a second increment here for the same code.
             if 'return' in code and 'def ' in code:
-                self.state.scores.code_quality = min(100, self.state.scores.code_quality + 20)
                 self.state.scores.evaluated_aspects["wrote_working_code"] = True
                 
                 # Probe their implementation
@@ -791,10 +793,14 @@ class InterviewEngine:
     
     def _handle_optimization_stage(self, message: str, code: str) -> str:
         """Handle optimization discussion stage."""
-        
+
         if self.state.user_mentioned_complexity:
             self.state.scores.complexity_analysis = min(100, self.state.scores.complexity_analysis + 20)
-            
+            if code and len(code.strip()) > 50:
+                # Genuinely engaged with optimization: discussed complexity
+                # while having real code on the table to optimize.
+                self.state.scores.evaluated_aspects["optimized_solution"] = True
+
             # Follow up on their complexity analysis
             followups = [
                 "Can we reduce the space complexity?",
@@ -824,14 +830,14 @@ class InterviewEngine:
     
     def _handle_behavioral_stage(self, message: str) -> str:
         """Handle behavioral questions stage."""
-        behavioral_questions = [
-            "Tell me about a time you had to debug a difficult issue. How did you approach it?",
-            "Describe a project where you had to learn a new technology quickly.",
-            "How do you handle disagreements about technical decisions with teammates?",
-            "What's a piece of code you're particularly proud of? Why?",
-            "Tell me about a time you had to meet a tight deadline. How did you prioritize?",
-        ]
-        
+        # Difficulty actually matters here now: junior/mid/senior each get
+        # their own question pool (previously this used one flat list
+        # regardless of self.state.config.difficulty, while a separate,
+        # difficulty-tiered BEHAVIORAL_QUESTIONS dict sat unused below).
+        behavioral_questions = BEHAVIORAL_QUESTIONS.get(
+            self.state.config.difficulty, BEHAVIORAL_QUESTIONS[InterviewDifficulty.MID]
+        )
+
         # Filter out already asked questions
         available = [q for q in behavioral_questions if q not in self.state.asked_questions]
         
@@ -906,7 +912,12 @@ class InterviewEngine:
             strengths.append("Produced working code")
         else:
             improvements.append("Focus on getting to working code faster")
-        
+
+        if scores.evaluated_aspects["optimized_solution"]:
+            strengths.append("Actively discussed optimizing the solution")
+        else:
+            improvements.append("Discuss how you'd optimize your solution once it works")
+
         feedback = f"""## 📊 Interview Feedback
 
 **Overall Score:** {total:.0f}/100 (Grade: {grade})

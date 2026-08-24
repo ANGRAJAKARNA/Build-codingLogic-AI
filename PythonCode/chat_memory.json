@@ -56,13 +56,29 @@
       "topic": "linux",
       "rating": null,
       "timestamp": "2026-01-24T21:59:23.789760"
+    },
+    {
+      "q": "What is class?",
+      "a": "## 🏗️ Classes in Python\n\n**Definition:** A class is a blueprint for creating objects. Objects have attributes (data) and methods (functions).\n\n### Basic Class Structure\n```python\nclass Dog:\n    \"\"\"A simple class representing a dog.\"\"\"\n    \n    def __init__(self, name, age):\n        \"\"\"Initialize name and age attributes.\"\"\"\n        self.name = name\n        self.age = age\n    \n    def sit(self):\n        \"\"\"Simulate a dog sitting.\"\"\"\n        print(f\"{self.name} is now sitting.\")\n    \n    def roll_o",
+      "topic": "class",
+      "rating": null,
+      "timestamp": "2026-08-24T12:15:17.543702"
+    },
+    {
+      "q": "Robot Framework",
+      "a": "## 🤖 What is Robot Framework?\n\n**Robot Framework** is an open-source automation framework for acceptance testing, ATDD, and RPA.\n\n### Key Features:\n- Keyword-driven testing approach\n- Easy-to-read tabular syntax\n- Rich ecosystem of libraries\n- Excellent reporting\n- Platform independent\n\n### Installation:\n```bash\npip install robotframework\npip install robotframework-seleniumlibrary  # For web testing\n```\n\n### First Test:\n```robot\n*** Settings ***\nLibrary    SeleniumLibrary\n\n*** Variables ***\n${UR",
+      "topic": "robot_framework",
+      "rating": null,
+      "timestamp": "2026-08-24T12:21:27.537724"
     }
   ],
   "learned_facts": [],
   "session_count": 0,
   "topics_asked": {
     "networking": 6,
-    "linux": 1
+    "linux": 1,
+    "class": 1,
+    "robot_framework": 1
   },
   "last_session": null,
   "user_profile": {

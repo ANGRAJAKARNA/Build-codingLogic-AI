@@ -68,7 +68,7 @@ except ImportError:
 QUESTIONS = {
 
     # ======================
-    # BASIC LEVEL (30 Questions)
+    # BASIC LEVEL (60 Questions)
     # ======================
     "Basic": [
 
@@ -1319,7 +1319,7 @@ QUESTIONS = {
     ],
 
     # ======================
-    # INTERMEDIATE LEVEL (25 Questions)
+    # INTERMEDIATE LEVEL (50 Questions)
     # ======================
     "Intermediate": [
 
@@ -1522,7 +1522,7 @@ QUESTIONS = {
             ],
             "solution": """def fibonacci(n):
     fib = [0, 1]
-    while fib[-1] + fib[-2] <= n:
+    while fib[-1] + fib[-2] < n:
         fib.append(fib[-1] + fib[-2])
     return fib""",
             "time_complexity": "O(n)",
@@ -1570,7 +1570,7 @@ QUESTIONS = {
                 "Use isalpha() to check for letters"
             ],
             "solution": """def count_consonants(n):
-    vowels = 'aeiouAEIOU'
+    vowels = 'aeiouyAEIOUY'
     return sum(1 for c in n if c.isalpha() and c not in vowels)""",
             "time_complexity": "O(n)",
             "space_complexity": "O(1)",
@@ -1897,8 +1897,7 @@ QUESTIONS = {
             ],
             "solution": """def is_valid_phone(phone):
     import re
-    digits = re.sub(r'\\D', '', phone)
-    return len(digits) == 10""",
+    return bool(re.match(r'^\\d{10}$|^\\d{3}-\\d{3}-\\d{4}$', phone))""",
             "time_complexity": "O(n)",
             "space_complexity": "O(n)",
             "tags": ["regex", "strings"]
@@ -2477,7 +2476,7 @@ QUESTIONS = {
     ],
 
     # ======================
-    # ADVANCED LEVEL (20 Questions)
+    # ADVANCED LEVEL (40 Questions)
     # ======================
     "Advanced": [
 

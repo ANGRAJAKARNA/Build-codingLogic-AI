@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from evaluator import (
     evaluate_user_code,
     check_code_security,
-    format_time_error,
+    format_runtime_error,
     SAFE_BUILTINS,
     TIMEOUT_SECONDS
 )

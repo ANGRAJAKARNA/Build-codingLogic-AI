@@ -24,6 +24,8 @@ import math
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 
+from persistence import atomic_write_json, get_visitor_dir
+
 
 # =============================================================================
 # SMART MATCHER - Advanced similarity matching with stemming & synonyms
@@ -787,11 +789,11 @@ class ConversationMemory:
         return {}
     
     def _save(self):
-        """Save memory to JSON file."""
+        """Save memory to JSON file (atomic — safe if the same visitor has
+        two tabs open writing concurrently)."""
         try:
-            with open(self.file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.memory, f, indent=2, ensure_ascii=False)
-        except IOError:
+            atomic_write_json(self.file_path, self.memory)
+        except (IOError, OSError):
             pass
     
     def remember_preference(self, key: str, value: Any):
@@ -1096,11 +1098,11 @@ class FeedbackLearner:
         return {}
     
     def _save(self):
-        """Save feedback data to JSON file."""
+        """Save feedback data to JSON file (atomic — safe if the same
+        visitor has two tabs open writing concurrently)."""
         try:
-            with open(self.file_path, 'w', encoding='utf-8') as f:
-                json.dump(self.data, f, indent=2, ensure_ascii=False)
-        except IOError:
+            atomic_write_json(self.file_path, self.data)
+        except (IOError, OSError):
             pass
     
     def record_feedback(self, topic: str, question: str, answer: str, 
@@ -1453,64 +1455,86 @@ def detect_topic(message: str) -> Optional[str]:
 # SINGLETON INSTANCES - Global access throughout the app
 # =============================================================================
 
-# Create singleton instances
-_memory_instance = None
-_feedback_instance = None
+# Per-visitor instance caches. Streamlit Cloud runs one shared process for
+# every visitor, so a single global instance here would mean every visitor
+# reads/writes the same chat memory and feedback data. Keyed by visitor_id
+# (see visitor_identity.py) instead, with a bounded size so a long-lived
+# process doesn't slowly accumulate memory across many distinct anonymous
+# visitors over time — a simple FIFO eviction (oldest-inserted key first),
+# not strict LRU, which is enough to bound growth without extra bookkeeping.
+_memory_instances: Dict[str, "ConversationMemory"] = {}
+_feedback_instances: Dict[str, "FeedbackLearner"] = {}
+_MAX_CACHED_VISITORS = 200
 
 
-def get_memory() -> ConversationMemory:
-    """Get the singleton ConversationMemory instance."""
-    global _memory_instance
-    if _memory_instance is None:
-        _memory_instance = ConversationMemory()
-    return _memory_instance
+def _evict_oldest_if_over_capacity(cache: Dict) -> None:
+    if len(cache) > _MAX_CACHED_VISITORS:
+        oldest_key = next(iter(cache))
+        cache.pop(oldest_key, None)
 
 
-def get_feedback_learner() -> FeedbackLearner:
-    """Get the singleton FeedbackLearner instance."""
-    global _feedback_instance
-    if _feedback_instance is None:
-        _feedback_instance = FeedbackLearner()
-    return _feedback_instance
+def get_memory(visitor_id: str) -> ConversationMemory:
+    """Get this visitor's ConversationMemory instance, creating it (backed
+    by their own chat_memory.json under data/visitors/<visitor_id>/) if
+    this is the first call for that visitor in this process."""
+    if visitor_id not in _memory_instances:
+        path = get_visitor_dir(visitor_id) / "chat_memory.json"
+        _memory_instances[visitor_id] = ConversationMemory(file_path=str(path))
+        _evict_oldest_if_over_capacity(_memory_instances)
+    return _memory_instances[visitor_id]
+
+
+def get_feedback_learner(visitor_id: str) -> FeedbackLearner:
+    """Get this visitor's FeedbackLearner instance, creating it (backed by
+    their own feedback_data.json under data/visitors/<visitor_id>/) if this
+    is the first call for that visitor in this process."""
+    if visitor_id not in _feedback_instances:
+        path = get_visitor_dir(visitor_id) / "feedback_data.json"
+        _feedback_instances[visitor_id] = FeedbackLearner(file_path=str(path))
+        _evict_oldest_if_over_capacity(_feedback_instances)
+    return _feedback_instances[visitor_id]
 
 
 # =============================================================================
 # CONVENIENCE FUNCTIONS - Easy integration
 # =============================================================================
 
-def store_interaction(question: str, answer: str, rating: int = None):
+def store_interaction(visitor_id: str, question: str, answer: str, rating: int = None):
     """
     Store a Q&A interaction (convenience wrapper).
-    
+
     Args:
+        visitor_id: Anonymous per-visitor id (see visitor_identity.py) —
+            selects whose chat memory this gets stored in
         question: User's question
         answer: Bot's response
         rating: Optional rating (1-5)
     """
     topic = detect_topic(question)
-    memory = get_memory()
+    memory = get_memory(visitor_id)
     memory.store_qa(question, answer, topic, rating)
 
 
-def record_user_feedback(question: str, answer: str, is_positive: bool, correction: str = None):
+def record_user_feedback(visitor_id: str, question: str, answer: str, is_positive: bool, correction: str = None):
     """
     Record user feedback (convenience wrapper).
-    
+
     Args:
+        visitor_id: Anonymous per-visitor id
         question: Original question
         answer: Bot's response
         is_positive: True for thumbs up, False for thumbs down
         correction: User's correction text (optional)
     """
     topic = detect_topic(question)
-    learner = get_feedback_learner()
+    learner = get_feedback_learner(visitor_id)
     learner.record_feedback(topic, question, answer, is_positive, correction)
 
 
-def get_learning_context(query: str) -> Dict:
+def get_learning_context(visitor_id: str, query: str) -> Dict:
     """
     Get all learning-related context for a query.
-    
+
     Returns dict with:
         - relevant_qa: Past similar Q&A pairs
         - best_rated: Highest rated response for topic
@@ -1520,12 +1544,12 @@ def get_learning_context(query: str) -> Dict:
         - user_profile: User's profile info
     """
     topic = detect_topic(query)
-    memory = get_memory()
-    learner = get_feedback_learner()
-    
+    memory = get_memory(visitor_id)
+    learner = get_feedback_learner(visitor_id)
+
     # Get the best learned response (corrections > rated > topic best)
     learned_response = learner.get_learned_response(query, topic)
-    
+
     return {
         "topic": topic,
         "relevant_qa": memory.get_relevant_context(query, limit=2),
@@ -1538,14 +1562,14 @@ def get_learning_context(query: str) -> Dict:
     }
 
 
-def get_combined_stats() -> Dict:
-    """Get combined statistics from memory and feedback."""
-    memory = get_memory()
-    learner = get_feedback_learner()
-    
+def get_combined_stats(visitor_id: str) -> Dict:
+    """Get combined statistics from memory and feedback for this visitor."""
+    memory = get_memory(visitor_id)
+    learner = get_feedback_learner(visitor_id)
+
     mem_stats = memory.get_stats()
     fb_stats = learner.get_stats()
-    
+
     return {
         "memory": mem_stats,
         "feedback": fb_stats,
@@ -1556,53 +1580,54 @@ def get_combined_stats() -> Dict:
     }
 
 
-def get_smart_response(query: str) -> Optional[Dict]:
+def get_smart_response(visitor_id: str, query: str) -> Optional[Dict]:
     """
-    Main entry point: Get the smartest response for a query.
-    
+    Main entry point: Get the smartest response for a query, from this
+    visitor's own learned corrections/ratings.
+
     Checks in order:
     1. User corrections (highest priority)
     2. Highly-rated similar responses
     3. Best response for topic
-    
+
     Returns:
         Dict with 'answer', 'confidence', 'source' or None if nothing found
     """
     topic = detect_topic(query)
-    learner = get_feedback_learner()
-    memory = get_memory()
-    
+    learner = get_feedback_learner(visitor_id)
+    memory = get_memory(visitor_id)
+
     # Get learned response
     learned = learner.get_learned_response(query, topic)
-    
+
     if learned:
         # Track usage
         learner.increment_usage(query, topic)
-        
+
         # Update user profile
         memory.update_user_profile(query, topic)
-        
+
         return learned
-    
+
     return None
 
 
-def update_learning_from_feedback(question: str, answer: str, 
+def update_learning_from_feedback(visitor_id: str, question: str, answer: str,
                                    is_positive: bool, correction: str = None):
     """
     Update learning based on user feedback.
     This is the main function to call after user gives feedback.
     """
     topic = detect_topic(question)
-    memory = get_memory()
-    learner = get_feedback_learner()
-    
+    memory = get_memory(visitor_id)
+    learner = get_feedback_learner(visitor_id)
+
     # Record the feedback
     learner.record_feedback(topic, question, answer, is_positive, correction)
-    
+
     # Update user profile
     memory.update_user_profile(question, topic, was_helpful=is_positive)
-    
+
     # If positive and topic detected, check if mastered
     if is_positive and topic:
         # Count positive feedbacks for this topic
