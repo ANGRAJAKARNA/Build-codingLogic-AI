@@ -1,4 +1,4 @@
-# PyCode AI - Intelligent Python Learning Platform 🤖
+# PyCode AI - Intelligent Python Learning Platform 
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg" alt="Python">
@@ -9,23 +9,23 @@
 
 An AI-powered interactive platform for learning Python programming, test automation, Linux, and networking concepts. Features practice problems, mock interviews, and an intelligent chatbot assistant.
 
-## ✨ Features
+##  Features
 
-### 🎯 Practice Mode
+###  Practice Mode
 - **188 Coding Challenges** across multiple difficulty levels (150 Python: Basic/Intermediate/Advanced, plus 38 automation problems)
 - **Real-time Code Execution** with secure sandbox environment
 - **Instant Feedback** with test case validation
 - **Smart Hints** and solution explanations
 - **Progress Tracking** with achievements and streaks
 
-### 🎤 Interview Mode
+###  Interview Mode
 - **Mock Technical Interviews** simulating real coding interviews
 - **Multi-stage Interview Flow** (Introduction → Problem Understanding → Solution Design → Implementation → Review)
 - **AI Interviewer** that adapts to your responses
 - **Performance Scoring** with detailed feedback
 - **Interview History** tracking
 
-#### 🎙️ Voice Mode (NEW!)
+####  Voice Mode (NEW!)
 - **Voice-enabled interviews** - Interviewer speaks questions aloud using Text-to-Speech
 - **Self-introduction round** - Start with a 30-second self-introduction
 - **Voice responses** - Record your answers using the microphone
@@ -33,7 +33,7 @@ An AI-powered interactive platform for learning Python programming, test automat
 - **Text fallback** - Type responses if voice is unavailable
 - Choose between **Text Mode** or **Voice Mode** when starting an interview
 
-### 🤖 AI Chat Assistant
+###  AI Chat Assistant
 Comprehensive knowledge base covering:
 
 | Domain | Concepts |
@@ -46,7 +46,7 @@ Comprehensive knowledge base covering:
 
 **Total: 175+ concepts** with detailed explanations, code examples, and best practices.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.9 or higher
@@ -110,7 +110,7 @@ print(get_voice_capabilities())
 - **Microphone not working**: Check browser permissions and system audio settings
 - **Offline mode**: Use `pyttsx3` for TTS without internet (lower quality)
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 PythonCode/
@@ -130,7 +130,7 @@ PythonCode/
 └── README.md                 # This file
 ```
 
-## 🎨 User Interface
+##  User Interface
 
 The platform features a modern **Futuristic Neon Cyber** design with:
 - Dark theme with cyan/purple accents
@@ -139,7 +139,7 @@ The platform features a modern **Futuristic Neon Cyber** design with:
 - Real-time chat interface with typing indicators
 - Collapsible sidebar with quick prompts
 
-## 💡 Usage Examples
+##  Usage Examples
 
 ### Practice Mode
 1. Select a difficulty level (Easy/Medium/Hard)
@@ -190,7 +190,7 @@ Ask questions like:
 | Speech-to-Text | SpeechRecognition (Google API) |
 | Audio Recording | audio-recorder-streamlit |
 
-## 📊 Concept Coverage
+##  Concept Coverage
 
 ### Python Programming
 - Data Structures (Lists, Dicts, Sets, Tuples)
@@ -228,7 +228,7 @@ Ask questions like:
 - Docker/Containers
 - Network Configuration
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
@@ -238,16 +238,16 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📝 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Author
+##  Author
 
-**Naveen Kumar Yellared**
+**Naveen Kumar Yellareddy**
 - GitHub: [@ANGRAJAKARNA](https://github.com/ANGRAJAKARNA)
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - Streamlit for the amazing web framework
 - Groq for AI API services
@@ -255,7 +255,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-<p align="center">
-  Made with ❤️ for learners everywhere
-</p>
 
